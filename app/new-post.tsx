@@ -1,12 +1,12 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Image, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, StyleSheet, View } from 'react-native';
 
-import { Button, Chip, ErrorText, Field, Muted, Screen } from '@/components/ui';
+import { Button, Chip, ErrorText, Field, Muted, Screen, Text } from '@/components/ui';
 import { api, errMsg } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { IMAGE_TYPES, VIDEO_TYPES, uploadAsset } from '@/lib/media';
 import { colors, radius, space } from '@/lib/theme';
 import { Post } from '@/lib/types';
 
@@ -17,12 +17,6 @@ const TAGS: { key: Post['tag']; label: string }[] = [
   { key: 'video', label: 'Vídeo' },
 ];
 const MAX_BYTES = 20 * 1024 * 1024;
-const ALLOWED: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'video/mp4': 'mp4',
-};
 
 export default function NewPost() {
   const { session } = useAuth();
@@ -43,7 +37,7 @@ export default function NewPost() {
     if (res.canceled) return;
     const a = res.assets[0];
     const mime = a.mimeType ?? (a.type === 'video' ? 'video/mp4' : 'image/jpeg');
-    if (!ALLOWED[mime]) return setError('Formato não suportado. Use JPG, PNG, WEBP ou MP4.');
+    if (!IMAGE_TYPES[mime] && !VIDEO_TYPES[mime]) return setError('Formato não suportado. Use JPG, PNG, WEBP ou MP4.');
     if (a.fileSize && a.fileSize > MAX_BYTES) return setError('Arquivo muito grande. O limite é 20 MB.');
     setError(null);
     setAsset({ ...a, mimeType: mime });
@@ -58,12 +52,14 @@ export default function NewPost() {
       let mediaUrl: string | undefined;
       if (asset) {
         const mime = asset.mimeType!;
-        const path = `${session.user.id}/${Date.now()}.${ALLOWED[mime]}`;
-        const bytes = await (await fetch(asset.uri)).arrayBuffer();
-        if (bytes.byteLength > MAX_BYTES) throw new Error('Arquivo muito grande. O limite é 20 MB.');
-        const { error: upErr } = await supabase.storage.from('posts').upload(path, bytes, { contentType: mime });
-        if (upErr) throw new Error('Não foi possível enviar a mídia. Tente de novo.');
-        mediaUrl = supabase.storage.from('posts').getPublicUrl(path).data.publicUrl;
+        mediaUrl = await uploadAsset({
+          bucket: 'posts',
+          userId: session.user.id,
+          uri: asset.uri,
+          mime,
+          ext: IMAGE_TYPES[mime] ?? VIDEO_TYPES[mime],
+          maxBytes: MAX_BYTES,
+        });
       }
       await api('/posts', { method: 'POST', body: { text: text.trim(), tag, score: score.trim(), mediaUrl } });
       router.back();

@@ -1,8 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Avatar, Button, Card, Empty, ErrorText, Field, Loading, Muted, Screen } from '@/components/ui';
+import { Avatar, Button, Card, Empty, ErrorText, Field, Loading, Muted, Screen, Text } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
 import { timeAgo } from '@/lib/game';
 import { colors, space } from '@/lib/theme';
@@ -36,7 +36,7 @@ export default function Comments() {
       {data && data.comments.length === 0 && <Empty title="Sem comentários" hint="Comece a conversa." />}
       {data?.comments.map((c) => (
         <Card key={c.id} style={{ flexDirection: 'row', gap: space.md }}>
-          <Avatar name={c.authorName} size={36} />
+          <Avatar name={c.authorName} url={c.authorAvatarUrl} size={38} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.text, fontWeight: '800' }}>
               {c.authorName} <Muted>· {timeAgo(c.createdAt)}</Muted>

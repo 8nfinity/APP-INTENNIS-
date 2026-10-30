@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Logo } from '@/components/Logo';
-import { Button, ErrorText, Field, H1, Muted, Screen } from '@/components/ui';
+import { Button, ErrorText, Field, H1, Muted, Screen, Text } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { colors, space } from '@/lib/theme';
 

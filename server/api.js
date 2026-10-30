@@ -40,7 +40,7 @@ function addDays(iso, n) {
 }
 
 const PLAYER_SQL = `
-  select p.id, p.name, p.username, p.bio, p.is_admin as "isAdmin",
+  select p.id, p.name, p.username, p.bio, p.is_admin as "isAdmin", p.avatar_url as "avatarUrl",
     coalesce((select sum(points) from point_events where player_id = p.id), 0)::int as points,
     coalesce((select sum(points) from point_events where player_id = p.id
       and created_at >= date_trunc('month', now() at time zone '${TZ}') at time zone '${TZ}'), 0)::int as "monthPoints",
@@ -50,19 +50,32 @@ const PLAYER_SQL = `
     (select count(*) from bookings b where b.player_id = p.id and b.kind = 'aula' and b.status = 'concluido')::int as classes
   from players p`;
 
-module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl }) {
+module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, adminEmails = [] }) {
   const r = express.Router();
   const wrap = (fn) => (req, res, next) => fn(req, res).catch(next);
 
   async function me(req) {
     const { rows } = await pool.query(`${PLAYER_SQL} where p.auth_user_id = $1`, [req.user.id]);
-    return rows[0] || null;
+    const p = rows[0] || null;
+    // Administrador pela lista ADMIN_EMAILS, só com e-mail confirmado (evita alguém
+    // se cadastrar com o e-mail de outra pessoa e virar admin).
+    if (p && !p.isAdmin && req.user.confirmed && adminEmails.includes((req.user.email || '').toLowerCase())) {
+      await pool.query('update players set is_admin = true where id = $1', [p.id]);
+      p.isAdmin = true;
+    }
+    return p;
   }
   async function needMe(req) {
     const p = await me(req);
     if (!p) throw new HttpError(409, 'Complete seu perfil antes de continuar');
     return p;
   }
+  async function needAdmin(req) {
+    const p = await needMe(req);
+    if (!p.isAdmin) throw new HttpError(403, 'Apenas administradores');
+    return p;
+  }
+  const avatarPrefix = (uid) => `${supabaseUrl}/storage/v1/object/public/avatars/${uid}/`;
   async function withStreaks(players) {
     if (!players.length) return players;
     const { rows } = await pool.query(
@@ -111,8 +124,20 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl }) {
     const username =
       req.body.username === undefined ? p.username : str(req.body.username, { min: 3, max: 20, field: 'Usuário' }).toLowerCase();
     if (!USERNAME.test(username)) throw bad('Usuário: 3 a 20 letras minúsculas, números, ponto ou underline');
+    let avatarUrl = p.avatarUrl;
+    if (req.body.avatarUrl !== undefined) {
+      if (req.body.avatarUrl === null) avatarUrl = null;
+      else {
+        // Só aceita foto enviada para a pasta da própria pessoa no nosso storage.
+        const u = req.body.avatarUrl;
+        if (typeof u !== 'string' || !u.startsWith(avatarPrefix(req.user.id)) || u.length > 400) throw bad('Foto inválida');
+        avatarUrl = u;
+      }
+    }
     try {
-      await pool.query('update players set name=$1, bio=$2, username=$3 where id=$4', [name, bio, username, p.id]);
+      await pool.query('update players set name=$1, bio=$2, username=$3, avatar_url=$4 where id=$5', [
+        name, bio, username, avatarUrl, p.id,
+      ]);
     } catch (e) {
       if (e.code === '23505') throw new HttpError(409, 'Esse usuário já existe');
       throw e;
@@ -137,7 +162,7 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl }) {
   // ---------- quadras e reservas ----------
   r.get('/courts', wrap(async (_req, res) => {
     const { rows } = await pool.query(
-      'select id, name, surface, price_per_hour::float as "pricePerHour" from courts order by id',
+      'select id, name, surface, price_per_hour::float as "pricePerHour" from courts where active order by id',
     );
     res.json({ courts: rows, hours: HOURS, classExtra: CLASS_EXTRA });
   }));
@@ -156,7 +181,9 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl }) {
     await expirePending();
     const { rows } = await pool.query(
       `select court_id as "courtId", hour from bookings
-       where date = $1 and status in ('pendente','pago','concluido')`,
+         where date = $1 and status in ('pendente','pago','concluido')
+       union
+       select court_id, hour from court_blocks where date = $1`,
       [date],
     );
     res.json({ taken: rows });
@@ -185,8 +212,10 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl }) {
     if (date < today.date || date > addDays(today.date, 30)) throw bad('Data fora do período de reserva');
     if (date === today.date && hour <= today.hour) throw bad('Esse horário já passou');
 
-    const court = (await pool.query('select id, price_per_hour::float as price from courts where id = $1', [courtId])).rows[0];
+    const court = (await pool.query('select id, price_per_hour::float as price from courts where id = $1 and active', [courtId])).rows[0];
     if (!court) throw bad('Quadra inválida');
+    const blocked = await pool.query('select 1 from court_blocks where court_id = $1 and date = $2 and hour = $3', [courtId, date, hour]);
+    if (blocked.rowCount) throw new HttpError(409, 'Esse horário está indisponível');
     const price = court.price + (kind === 'aula' ? CLASS_EXTRA : 0); // o preço vem SEMPRE do servidor
 
     await expirePending();
@@ -257,7 +286,7 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl }) {
   const MATCH_SQL = `
     select m.id, m.status, m.score, m.reported_by as "reportedBy", m.winner_id as "winnerId",
            m.challenger_id as "challengerId", m.opponent_id as "opponentId",
-           o.id as "otherId", o.name as "otherName", o.username as "otherUsername"
+           o.id as "otherId", o.name as "otherName", o.username as "otherUsername", o.avatar_url as "otherAvatarUrl"
     from matches m
     join players o on o.id = case when m.challenger_id = $1 then m.opponent_id else m.challenger_id end
     where $1 in (m.challenger_id, m.opponent_id)`;
@@ -373,7 +402,7 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl }) {
     const p = await needMe(req);
     const { rows } = await pool.query(
       `select po.id, po.text, po.media_url as "mediaUrl", po.tag, po.score, po.created_at as "createdAt",
-              a.id as "authorId", a.name as "authorName", a.username as "authorUsername",
+              a.id as "authorId", a.name as "authorName", a.username as "authorUsername", a.avatar_url as "authorAvatarUrl",
               (select count(*) from kudos k where k.post_id = po.id)::int as kudos,
               exists(select 1 from kudos k where k.post_id = po.id and k.player_id = $1) as "kudosByMe",
               (select count(*) from comments c where c.post_id = po.id)::int as comments
@@ -429,7 +458,7 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl }) {
     await needMe(req);
     if (!UUID.test(req.params.id)) throw bad('Post inválido');
     const { rows } = await pool.query(
-      `select c.id, c.text, c.created_at as "createdAt", a.name as "authorName", a.username as "authorUsername"
+      `select c.id, c.text, c.created_at as "createdAt", a.name as "authorName", a.username as "authorUsername", a.avatar_url as "authorAvatarUrl"
        from comments c join players a on a.id = c.author_id
        where c.post_id = $1 order by c.created_at asc limit 200`,
       [req.params.id],
@@ -446,6 +475,172 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl }) {
     await pool.query('insert into comments (post_id, author_id, text) values ($1,$2,$3)', [req.params.id, p.id, text]);
     res.status(201).json({ ok: true });
   }));
+
+  // ---------- administração (tudo exige is_admin) ----------
+  const adm = express.Router();
+  adm.use((req, _res, next) => {
+    needAdmin(req)
+      .then((p) => {
+        req.admin = p;
+        next();
+      })
+      .catch(next);
+  });
+
+  adm.get('/stats', wrap(async (_req, res) => {
+    const q = async (sql) => (await pool.query(sql)).rows[0];
+    const players = await q('select count(*)::int as n from players');
+    const today = await q(
+      `select count(*)::int as n from bookings where status in ('pago','concluido') and date = (now() at time zone '${TZ}')::date`,
+    );
+    const upcoming = await q(
+      `select count(*)::int as n from bookings where status = 'pago' and date >= (now() at time zone '${TZ}')::date`,
+    );
+    const revenue = await q(
+      `select coalesce(sum(price),0)::float as n from bookings
+       where status in ('pago','concluido') and payment_id is distinct from 'SIMULADO'
+         and date >= date_trunc('month', now() at time zone '${TZ}')::date`,
+    );
+    const posts = await q('select count(*)::int as n from posts');
+    const pendingMatches = await q(`select count(*)::int as n from matches where status = 'aguardando_confirmacao'`);
+    res.json({
+      players: players.n,
+      bookingsToday: today.n,
+      bookingsUpcoming: upcoming.n,
+      revenueMonth: revenue.n, // só pagamentos reais; os simulados não entram
+      posts: posts.n,
+      pendingMatches: pendingMatches.n,
+    });
+  }));
+
+  adm.get('/courts', wrap(async (_req, res) => {
+    const { rows } = await pool.query(
+      'select id, name, surface, price_per_hour::float as "pricePerHour", active from courts order by id',
+    );
+    res.json({ courts: rows });
+  }));
+
+  adm.post('/courts', wrap(async (req, res) => {
+    const name = str(req.body.name, { min: 2, max: 40, field: 'Nome' });
+    const surface = str(req.body.surface, { min: 2, max: 30, field: 'Piso' });
+    const price = Number(req.body.pricePerHour);
+    if (!(price >= 0 && price <= 5000)) throw bad('Preço inválido');
+    const id = `c${Date.now().toString(36)}`;
+    await pool.query('insert into courts (id, name, surface, price_per_hour) values ($1,$2,$3,$4)', [id, name, surface, price]);
+    res.status(201).json({ id });
+  }));
+
+  adm.patch('/courts/:id', wrap(async (req, res) => {
+    const c = (await pool.query('select * from courts where id = $1', [req.params.id])).rows[0];
+    if (!c) throw new HttpError(404, 'Quadra não encontrada');
+    const name = req.body.name === undefined ? c.name : str(req.body.name, { min: 2, max: 40, field: 'Nome' });
+    const surface = req.body.surface === undefined ? c.surface : str(req.body.surface, { min: 2, max: 30, field: 'Piso' });
+    const price = req.body.pricePerHour === undefined ? Number(c.price_per_hour) : Number(req.body.pricePerHour);
+    if (!(price >= 0 && price <= 5000)) throw bad('Preço inválido');
+    const active = req.body.active === undefined ? c.active : req.body.active === true;
+    await pool.query('update courts set name=$1, surface=$2, price_per_hour=$3, active=$4 where id=$5', [
+      name, surface, price, active, c.id,
+    ]);
+    res.json({ ok: true });
+  }));
+
+  adm.get('/blocks', wrap(async (_req, res) => {
+    const { rows } = await pool.query(
+      `select b.id, b.court_id as "courtId", c.name as "courtName", to_char(b.date,'YYYY-MM-DD') as date, b.hour, b.reason
+       from court_blocks b join courts c on c.id = b.court_id
+       where b.date >= (now() at time zone '${TZ}')::date order by b.date, b.hour limit 200`,
+    );
+    res.json({ blocks: rows });
+  }));
+
+  adm.post('/blocks', wrap(async (req, res) => {
+    const { courtId, date } = req.body;
+    const hour = Number(req.body.hour);
+    const reason = str(req.body.reason ?? '', { max: 100, field: 'Motivo' });
+    if (typeof courtId !== 'string' || !DATE.test(String(date)) || !HOURS.includes(hour)) throw bad('Dados inválidos');
+    const taken = await pool.query(
+      `select 1 from bookings where court_id = $1 and date = $2 and hour = $3 and status in ('pendente','pago','concluido')`,
+      [courtId, date, hour],
+    );
+    if (taken.rowCount) throw new HttpError(409, 'Já existe uma reserva nesse horário. Cancele a reserva primeiro.');
+    try {
+      await pool.query('insert into court_blocks (court_id, date, hour, reason) values ($1,$2,$3,$4)', [courtId, date, hour, reason]);
+    } catch (e) {
+      if (e.code === '23505') throw new HttpError(409, 'Esse horário já está bloqueado');
+      if (e.code === '23503') throw bad('Quadra inválida');
+      throw e;
+    }
+    res.status(201).json({ ok: true });
+  }));
+
+  adm.delete('/blocks/:id', wrap(async (req, res) => {
+    if (!UUID.test(req.params.id)) throw bad('Bloqueio inválido');
+    await pool.query('delete from court_blocks where id = $1', [req.params.id]);
+    res.json({ ok: true });
+  }));
+
+  adm.get('/bookings', wrap(async (req, res) => {
+    const date = String(req.query.date || '');
+    const byDate = DATE.test(date);
+    const { rows } = await pool.query(
+      `select b.id, b.court_id as "courtId", c.name as "courtName", to_char(b.date,'YYYY-MM-DD') as date, b.hour,
+              b.kind, b.price::float as price, b.status, p.name as "playerName", p.username as "playerUsername"
+       from bookings b join courts c on c.id = b.court_id join players p on p.id = b.player_id
+       where b.status <> 'cancelado' and ${byDate ? 'b.date = $1' : `b.date >= (now() at time zone '${TZ}')::date and $1::text is not null`}
+       order by b.date, b.hour limit 200`,
+      [byDate ? date : 'x'],
+    );
+    res.json({ bookings: rows });
+  }));
+
+  adm.post('/bookings/:id/cancel', wrap(async (req, res) => {
+    if (!UUID.test(req.params.id)) throw bad('Reserva inválida');
+    const { rowCount } = await pool.query(
+      `update bookings set status = 'cancelado' where id = $1 and status in ('pendente','pago')`,
+      [req.params.id],
+    );
+    if (!rowCount) throw new HttpError(409, 'Essa reserva não pode ser cancelada');
+    res.json({ ok: true });
+  }));
+
+  adm.get('/players', wrap(async (req, res) => {
+    const q = String(req.query.q || '').trim().slice(0, 40);
+    const { rows } = await pool.query(
+      `${PLAYER_SQL} where ($1 = '' or p.name ilike '%' || $1 || '%' or p.username ilike '%' || $1 || '%')
+       order by points desc, p.created_at asc limit 100`,
+      [q],
+    );
+    res.json({ players: rows });
+  }));
+
+  adm.post('/players/:id/points', wrap(async (req, res) => {
+    if (!UUID.test(req.params.id)) throw bad('Jogador inválido');
+    const points = Number(req.body.points);
+    if (!Number.isInteger(points) || points === 0 || Math.abs(points) > 1000) throw bad('Pontos: número inteiro entre -1000 e 1000');
+    const note = str(req.body.note ?? '', { min: 3, max: 100, field: 'Motivo' });
+    const ok = await pool.query('select 1 from players where id = $1', [req.params.id]);
+    if (!ok.rowCount) throw new HttpError(404, 'Jogador não encontrado');
+    await pool.query(
+      `insert into point_events (player_id, points, reason, ref_id, note) values ($1,$2,'admin_adjust',gen_random_uuid(),$3)`,
+      [req.params.id, points, `${note} (por ${req.admin.username})`],
+    );
+    res.json({ ok: true });
+  }));
+
+  adm.post('/players/:id/admin', wrap(async (req, res) => {
+    if (!UUID.test(req.params.id)) throw bad('Jogador inválido');
+    if (req.params.id === req.admin.id) throw new HttpError(409, 'Você não pode alterar o seu próprio acesso');
+    await pool.query('update players set is_admin = $1 where id = $2', [req.body.isAdmin === true, req.params.id]);
+    res.json({ ok: true });
+  }));
+
+  adm.delete('/events/:id', wrap(async (req, res) => {
+    if (!UUID.test(req.params.id)) throw bad('Evento inválido');
+    await pool.query('delete from events where id = $1', [req.params.id]);
+    res.json({ ok: true });
+  }));
+
+  r.use('/admin', adm);
 
   r.use((err, _req, res, _next) => {
     if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });

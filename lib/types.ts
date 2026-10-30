@@ -4,6 +4,7 @@ export type Player = {
   username: string;
   bio: string;
   isAdmin: boolean;
+  avatarUrl: string | null;
   points: number;
   monthPoints: number;
   wins: number;
@@ -36,6 +37,7 @@ export type MatchRow = {
   otherId: string;
   otherName: string;
   otherUsername: string;
+  otherAvatarUrl: string | null;
 };
 
 export type Post = {
@@ -48,6 +50,7 @@ export type Post = {
   authorId: string;
   authorName: string;
   authorUsername: string;
+  authorAvatarUrl: string | null;
   kudos: number;
   kudosByMe: boolean;
   comments: number;
@@ -59,7 +62,25 @@ export type Comment = {
   createdAt: string;
   authorName: string;
   authorUsername: string;
+  authorAvatarUrl: string | null;
 };
+
+export type AdminCourt = Court & { active: boolean };
+
+export type AdminBooking = {
+  id: string;
+  courtId: string;
+  courtName: string;
+  date: string;
+  hour: number;
+  kind: BookingKind;
+  price: number;
+  status: Booking['status'];
+  playerName: string;
+  playerUsername: string;
+};
+
+export type CourtBlock = { id: string; courtId: string; courtName: string; date: string; hour: number; reason: string };
 
 export type GameEvent = {
   id: string;

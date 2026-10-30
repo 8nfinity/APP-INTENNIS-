@@ -1,69 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Logo } from '@/components/Logo';
-import {
-  Avatar,
-  Button,
-  Card,
-  Chip,
-  Empty,
-  ErrorState,
-  H1,
-  Muted,
-  ProgressBar,
-  Screen,
-  Title,
-  formatBRL,
-} from '@/components/ui';
+import { Avatar, Button, Card, Gauge, H1, Muted, Screen, StatTile, Text, Title } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
 import { useAuth, useMe } from '@/lib/auth';
-import { fmtDate, levelFor, toISO } from '@/lib/game';
-import { colors, radius, space } from '@/lib/theme';
-import { Booking, BookingKind, Court } from '@/lib/types';
-
-const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-
-function nextDays(n: number) {
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    return { iso: toISO(d), label: WEEKDAYS[d.getDay()], day: d.getDate() };
-  });
-}
+import { fmtDate, levelFor } from '@/lib/game';
+import { colors, space } from '@/lib/theme';
+import { Booking, Court, Player } from '@/lib/types';
 
 export default function Inicio() {
   const me = useMe();
   const { refreshPlayer } = useAuth();
-  const days = nextDays(10);
-  const [date, setDate] = useState(days[0].iso);
-  const [courtId, setCourtId] = useState('c1');
-  const [kind, setKind] = useState<BookingKind>('jogo');
-
-  const courtsQ = useFetch<{ courts: Court[]; hours: number[]; classExtra: number }>('/courts');
-  const availQ = useFetch<{ taken: { courtId: string; hour: number }[] }>(`/availability?date=${date}`);
+  const rankQ = useFetch<{ players: Player[] }>('/ranking');
   const bookingsQ = useFetch<{ bookings: Booking[] }>('/bookings');
+  const courtsQ = useFetch<{ courts: Court[] }>('/courts');
 
   const lvl = levelFor(me.points);
-  const courts = courtsQ.data?.courts ?? [];
-  const court = courts.find((c) => c.id === courtId) ?? courts[0];
-  const price = court ? court.pricePerHour + (kind === 'aula' ? courtsQ.data?.classExtra ?? 0 : 0) : 0;
-  const now = new Date();
-  const isToday = date === toISO(now);
+  const pos = (rankQ.data?.players ?? []).findIndex((p) => p.id === me.id) + 1;
+  const next = (bookingsQ.data?.bookings ?? [])
+    .filter((b) => b.status === 'pago')
+    .sort((a, b) => (a.date + String(a.hour).padStart(2, '0')).localeCompare(b.date + String(b.hour).padStart(2, '0')))[0];
+  const courtName = (id: string) => courtsQ.data?.courts.find((c) => c.id === id)?.name ?? '';
 
-  const isTaken = (hour: number) =>
-    (isToday && hour <= now.getHours()) ||
-    !!availQ.data?.taken.some((t) => t.courtId === court?.id && t.hour === hour);
-
-  const upcoming = (bookingsQ.data?.bookings ?? []).filter((b) => b.status === 'pago' || b.status === 'concluido');
-  const next = upcoming.filter((b) => b.status === 'pago').sort((a, b) => (a.date + a.hour).localeCompare(b.date + b.hour))[0];
-
-  const pickSlot = (hour: number) =>
-    router.push({ pathname: '/checkout', params: { courtId: court.id, date, hour: String(hour), kind } });
-
-  const doCheckIn = async (id: string) => {
+  const checkIn = async (id: string) => {
     try {
       const { points } = await api<{ points: number }>(`/bookings/${id}/checkin`, { method: 'POST' });
       Alert.alert('Presença confirmada! 🎾', `Você ganhou +${points} pontos no ranking.`);
@@ -74,115 +35,81 @@ export default function Inicio() {
     }
   };
 
-  const reloadAll = () => {
-    courtsQ.reload();
-    availQ.reload();
+  const reload = () => {
+    rankQ.reload();
     bookingsQ.reload();
+    refreshPlayer();
   };
 
   return (
-    <Screen refreshing={false} onRefresh={reloadAll}>
+    <Screen tab refreshing={false} onRefresh={reload}>
       <View style={s.top}>
-        <Logo size={34} />
-        <Avatar name={me.name} size={42} />
+        <Logo size={32} />
+        <View style={s.topRight}>
+          {me.isAdmin && (
+            <Pressable onPress={() => router.push('/admin')} style={s.adminBtn} hitSlop={8}>
+              <Ionicons name="shield-checkmark" size={16} color={colors.onAccent} />
+              <Text style={s.adminText}>Admin</Text>
+            </Pressable>
+          )}
+          <Pressable onPress={() => router.push('/perfil')} hitSlop={8}>
+            <Avatar name={me.name} url={me.avatarUrl} size={44} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={{ gap: 4 }}>
-        <Muted>Olá,</Muted>
-        <H1 style={{ fontSize: 34 }}>{me.name.split(' ')[0]} 👋</H1>
+        <Muted style={{ fontSize: 15 }}>Olá,</Muted>
+        <H1 style={{ fontSize: 40, lineHeight: 42 }}>{me.name.split(' ')[0]}</H1>
       </View>
 
-      <Card glow style={{ gap: space.sm }}>
-        <View style={s.between}>
-          <Text style={[s.level, { color: lvl.current.color }]}>{lvl.current.name}</Text>
-          <Text style={s.pts}>
-            {me.points}
-            <Text style={s.ptsUnit}> pts</Text>
+      <Card hero style={{ gap: space.md }}>
+        <Text style={s.heroTitle}>Seus{'\n'}pontos</Text>
+        <View style={{ alignItems: 'center' }}>
+          <Gauge value={lvl.progress} size={240}>
+            <Text style={s.gaugeNum}>{me.points}</Text>
+            <Text style={s.gaugeUnit}>pts</Text>
+          </Gauge>
+        </View>
+        <View style={s.levelPill}>
+          <Ionicons name="shield-checkmark" size={18} color={colors.accent} />
+          <Text style={s.levelText}>
+            <Text style={{ color: colors.accent, fontWeight: '800' }}>{lvl.current.name}</Text>
+            {lvl.next ? `  ·  faltam ${lvl.toNext} pts para ${lvl.next.name}` : '  ·  nível máximo'}
           </Text>
         </View>
-        <ProgressBar value={lvl.progress} color={lvl.current.color} />
-        <Muted>{lvl.next ? `Faltam ${lvl.toNext} pts para ${lvl.next.name}` : 'Você chegou ao topo!'}</Muted>
+        <Pressable onPress={() => router.push('/ranking')} style={s.slide}>
+          <View style={s.slideDot}>
+            <Ionicons name="trophy" size={20} color={colors.onAccent} />
+          </View>
+          <Text style={s.slideText}>Ver ranking  ›››</Text>
+        </Pressable>
       </Card>
 
-      {next && (
-        <Card style={s.between}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Muted>Próximo horário</Muted>
-            <Text style={s.nextTitle}>
-              {fmtDate(next.date)} · {String(next.hour).padStart(2, '0')}:00
-            </Text>
-            <Muted>
-              {next.kind === 'aula' ? 'Aula' : 'Jogo'} · {courts.find((c) => c.id === next.courtId)?.name ?? ''}
-            </Muted>
-          </View>
-          <Button label="Check-in" onPress={() => doCheckIn(next.id)} style={s.small} />
-        </Card>
-      )}
-
-      <Title style={{ fontSize: 24, marginTop: space.sm }}>Reserve sua quadra</Title>
-
-      {courtsQ.error && <ErrorState message={courtsQ.error} onRetry={courtsQ.reload} />}
-
-      <View style={s.row}>
-        <Chip label="Jogo livre" active={kind === 'jogo'} onPress={() => setKind('jogo')} />
-        <Chip label="Aula com professor" active={kind === 'aula'} onPress={() => setKind('aula')} />
-      </View>
-
-      <View style={[s.row, { flexWrap: 'nowrap' }]}>
-        {days.slice(0, 7).map((d) => (
-          <Pressable key={d.iso} onPress={() => setDate(d.iso)} style={[s.day, d.iso === date && s.dayActive]}>
-            <Text style={[s.dayLabel, d.iso === date && { color: colors.onAccent }]}>{d.label}</Text>
-            <Text style={[s.dayNum, d.iso === date && { color: colors.onAccent }]}>{d.day}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <View style={s.row}>
-        {courts.map((c) => (
-          <Chip key={c.id} label={`${c.name} · ${c.surface}`} active={c.id === court?.id} onPress={() => setCourtId(c.id)} />
-        ))}
-      </View>
-
-      {court && (
-        <Muted>
-          {formatBRL(price)} por hora{kind === 'aula' ? ' (inclui professor)' : ''}. Pague para confirmar o horário.
-        </Muted>
-      )}
-
       <View style={s.grid}>
-        {(courtsQ.data?.hours ?? []).map((h) => {
-          const taken = isTaken(h);
-          return (
-            <Pressable key={h} disabled={taken} onPress={() => pickSlot(h)} style={[s.slot, taken && s.slotTaken]}>
-              <Text style={[s.slotText, taken && { color: colors.muted, textDecorationLine: 'line-through' }]}>
-                {String(h).padStart(2, '0')}:00
-              </Text>
-            </Pressable>
-          );
-        })}
+        <StatTile value={pos ? `#${pos}` : '-'} label="Ranking" accent />
+        <StatTile value={String(me.wins)} label="Vitórias" />
+        <StatTile value={String(me.classes)} label="Aulas" />
+        <StatTile value={String(me.streak)} label="Sequência 🔥" />
       </View>
 
-      <Title style={{ marginTop: space.lg }}>Meus horários</Title>
-      {upcoming.length === 0 ? (
-        <Empty title="Nenhuma reserva ainda" hint="Escolha um horário acima para jogar." />
+      {next ? (
+        <Card glow style={{ gap: space.md }}>
+          <Muted>Próximo horário</Muted>
+          <Title style={{ fontSize: 26 }}>
+            {fmtDate(next.date)} · {String(next.hour).padStart(2, '0')}:00
+          </Title>
+          <Muted>
+            {next.kind === 'aula' ? 'Aula' : 'Jogo'} · {courtName(next.courtId)}
+          </Muted>
+          <Button label="Fazer check-in" arrow onPress={() => checkIn(next.id)} />
+        </Card>
       ) : (
-        upcoming.map((b) => (
-          <Card key={b.id} style={s.between}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.nextTitle}>
-                {b.kind === 'aula' ? 'Aula' : 'Jogo'} · {courts.find((c) => c.id === b.courtId)?.name ?? ''}
-              </Text>
-              <Muted>
-                {fmtDate(b.date)} às {String(b.hour).padStart(2, '0')}:00 · {formatBRL(b.price)}
-              </Muted>
-            </View>
-            {b.status === 'pago' ? (
-              <Button label="Check-in" onPress={() => doCheckIn(b.id)} style={s.small} />
-            ) : (
-              <Ionicons name="checkmark-circle" size={26} color={colors.success} />
-            )}
-          </Card>
-        ))
+        <Card glow style={{ gap: space.md }}>
+          <Title style={{ fontSize: 24 }}>Hora de jogar?</Title>
+          <Muted>Reserve uma quadra e ganhe pontos a cada check-in.</Muted>
+          <Button label="Reservar quadra" arrow onPress={() => router.push('/agendar')} />
+        </Card>
       )}
     </Screen>
   );
@@ -190,35 +117,32 @@ export default function Inicio() {
 
 const s = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.md },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  level: { fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
-  pts: { color: colors.text, fontSize: 30, fontWeight: '900' },
-  ptsUnit: { color: colors.muted, fontSize: 14, fontWeight: '700' },
-  nextTitle: { color: colors.text, fontWeight: '800', fontSize: 17 },
-  day: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: radius.md,
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  adminBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: 4,
+    backgroundColor: colors.accent,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 999,
   },
-  dayActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  dayLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  dayNum: { color: colors.text, fontSize: 18, fontWeight: '900' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  slot: {
-    width: '23%',
-    paddingVertical: 13,
-    borderRadius: radius.md,
+  adminText: { color: colors.onAccent, fontWeight: '800', fontSize: 12 },
+  heroTitle: { color: colors.onAccent, fontSize: 40, fontWeight: '900', letterSpacing: -2, lineHeight: 40 },
+  gaugeNum: { color: colors.onAccent, fontSize: 62, fontWeight: '900', letterSpacing: -3, lineHeight: 64 },
+  gaugeUnit: { color: colors.onAccent, fontSize: 18, fontWeight: '800', opacity: 0.7, marginTop: -4 },
+  levelPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.cardAlt,
-    borderWidth: 1,
-    borderColor: colors.accent,
+    gap: 8,
+    backgroundColor: '#0A0A00',
+    borderRadius: 999,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
   },
-  slotTaken: { borderColor: colors.border, backgroundColor: colors.card },
-  slotText: { color: colors.text, fontWeight: '800' },
-  small: { paddingVertical: 10, paddingHorizontal: 16 },
+  levelText: { color: colors.text, fontSize: 14, flex: 1 },
+  slide: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(10,10,0,0.9)', borderRadius: 999, padding: 6, gap: 12 },
+  slideDot: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  slideText: { color: colors.text, fontWeight: '800', fontSize: 15 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
 });

@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Card, Empty, ErrorState, H1, Loading, Muted, Screen } from '@/components/ui';
+import { Card, Empty, ErrorState, H1, Loading, Muted, Screen, Text } from '@/components/ui';
 import { useFetch } from '@/lib/api';
-import { fmtDate } from '@/lib/game';
 import { colors, radius, space } from '@/lib/theme';
 import { GameEvent } from '@/lib/types';
 
@@ -13,6 +12,7 @@ const CATEGORY: Record<GameEvent['category'], { label: string; color: string }> 
   aula: { label: 'AULA', color: '#5BC0EB' },
   novidade: { label: 'NOVIDADE', color: colors.hot },
 };
+const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
 function daysUntil(iso: string) {
   const [y, m, d] = iso.split('-').map(Number);
@@ -34,26 +34,31 @@ export default function Eventos() {
     });
 
   return (
-    <Screen refreshing={false} onRefresh={reload}>
-      <H1 style={{ fontSize: 34 }}>Agenda do clube</H1>
+    <Screen tab refreshing={false} onRefresh={reload}>
+      <H1 style={{ fontSize: 40, lineHeight: 42 }}>Agenda{'\n'}do clube</H1>
       {loading && <Loading />}
       {error && <ErrorState message={error} onRetry={reload} />}
       {data && data.events.length === 0 && <Empty icon="calendar-outline" title="Sem eventos por enquanto" hint="Novidades do clube aparecem aqui." />}
-      {data?.events.map((e) => {
+      {data?.events.map((e, i) => {
         const cat = CATEGORY[e.category];
         const n = daysUntil(e.date);
         const on = watching.has(e.id);
+        const [, m, d] = e.date.split('-').map(Number);
         return (
-          <Card key={e.id} style={{ gap: space.sm }}>
+          <Card key={e.id} glow={i === 0} style={{ gap: space.md }}>
             <View style={s.top}>
-              <Text style={[s.tag, { color: cat.color, borderColor: cat.color }]}>{cat.label}</Text>
-              <Text style={s.when}>{n <= 0 ? 'Hoje' : n === 1 ? 'Amanhã' : `em ${n} dias`}</Text>
+              <View style={s.dateCircle}>
+                <Text style={s.dateDay}>{d}</Text>
+                <Text style={s.dateMonth}>{MONTHS[m - 1]}</Text>
+              </View>
+              <View style={{ flex: 1, gap: 6 }}>
+                <Text style={[s.tag, { color: cat.color, borderColor: cat.color }]}>{cat.label}</Text>
+                <Text style={s.when}>{n <= 0 ? 'Hoje' : n === 1 ? 'Amanhã' : `em ${n} dias`}</Text>
+              </View>
             </View>
             <Text style={s.title}>{e.title}</Text>
-            <Text style={s.desc}>{e.description}</Text>
-            <Muted>
-              {fmtDate(e.date)} · {e.place}
-            </Muted>
+            {!!e.description && <Text style={s.desc}>{e.description}</Text>}
+            {!!e.place && <Muted>📍 {e.place}</Muted>}
             <Pressable onPress={() => toggle(e.id)} style={[s.btn, on && s.btnOn]}>
               <Text style={[s.btnText, on && { color: colors.onAccent }]}>{on ? '🔔 Vou acompanhar' : 'Quero ser avisado'}</Text>
             </Pressable>
@@ -65,8 +70,12 @@ export default function Eventos() {
 }
 
 const s = StyleSheet.create({
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  dateCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  dateDay: { color: colors.onAccent, fontSize: 24, fontWeight: '900', lineHeight: 26, letterSpacing: -1 },
+  dateMonth: { color: colors.onAccent, fontSize: 11, fontWeight: '800' },
   tag: {
+    alignSelf: 'flex-start',
     fontSize: 11,
     fontWeight: '900',
     borderWidth: 1,
@@ -75,18 +84,17 @@ const s = StyleSheet.create({
     paddingVertical: 3,
     letterSpacing: 1,
   },
-  when: { color: colors.text, fontWeight: '800' },
-  title: { color: colors.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  desc: { color: colors.text, opacity: 0.8, lineHeight: 20 },
+  when: { color: colors.text, fontWeight: '700', fontSize: 15 },
+  title: { color: colors.text, fontSize: 26, fontWeight: '900', letterSpacing: -1, lineHeight: 28 },
+  desc: { color: colors.text, opacity: 0.8, lineHeight: 21, fontSize: 15 },
   btn: {
-    marginTop: space.xs,
     alignSelf: 'flex-start',
-    paddingVertical: 9,
-    paddingHorizontal: 15,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.cardAlt,
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
   btnOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   btnText: { color: colors.text, fontWeight: '700' },

@@ -1,3 +1,10 @@
+import {
+  Outfit_400Regular,
+  Outfit_500Medium,
+  Outfit_700Bold,
+  Outfit_800ExtraBold,
+  Outfit_900Black,
+} from '@expo-google-fonts/outfit';
 import { useFonts } from 'expo-font';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -44,7 +51,11 @@ const modal = (title: string) => ({
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    Outfit_400Regular,
+    Outfit_500Medium,
+    Outfit_700Bold,
+    Outfit_800ExtraBold,
+    Outfit_900Black,
   });
 
   useEffect(() => {
@@ -98,6 +109,9 @@ function RootNav() {
         <Stack.Screen name="edit-profile" options={{ headerShown: true, ...modal('Editar perfil') }} />
         <Stack.Screen name="match-result" options={{ headerShown: true, ...modal('Registrar resultado') }} />
         <Stack.Screen name="comments" options={{ headerShown: true, ...modal('Comentários') }} />
+      </Stack.Protected>
+      <Stack.Protected guard={authed && !!player?.isAdmin}>
+        <Stack.Screen name="admin" />
       </Stack.Protected>
     </Stack>
   );

@@ -1,5 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/ui';
 import { colors } from '@/lib/theme';
 
 // Logo provisório em texto ("IN." + "TENNIS CLUB"). Para usar o logo oficial,

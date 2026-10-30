@@ -23,7 +23,8 @@ app.use(
         imgSrc: ["'self'", 'data:', 'blob:', 'https://*.supabase.co'],
         mediaSrc: ["'self'", 'blob:', 'https://*.supabase.co'],
         fontSrc: ["'self'", 'data:'],
-        connectSrc: ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co'],
+        // blob:/data: permitem ao app ler a foto/vídeo escolhido no navegador antes do envio
+        connectSrc: ["'self'", 'blob:', 'data:', 'https://*.supabase.co', 'wss://*.supabase.co'],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
       },
@@ -68,6 +69,11 @@ if (pool) {
     buildApi(pool, {
       simulatedPayments: process.env.ALLOW_SIMULATED_PAYMENTS === 'true',
       supabaseUrl: SUPABASE_URL,
+      // E-mails (separados por vírgula) que viram administradores ao entrar, se o e-mail estiver confirmado.
+      adminEmails: (process.env.ADMIN_EMAILS || '')
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean),
     }),
   );
 } else {

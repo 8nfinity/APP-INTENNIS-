@@ -105,6 +105,26 @@ create table if not exists events (
   place text not null default ''
 );
 
+-- ---------- v3: admin, foto de perfil, quadras ativas e bloqueios ----------
+alter table players add column if not exists avatar_url text;
+alter table courts add column if not exists active boolean not null default true;
+
+create table if not exists court_blocks (
+  id uuid primary key default gen_random_uuid(),
+  court_id text not null references courts(id) on delete cascade,
+  date date not null,
+  hour int not null check (hour between 0 and 23),
+  reason text not null default '',
+  created_at timestamptz not null default now(),
+  unique (court_id, date, hour)
+);
+alter table court_blocks enable row level security;
+
+alter table point_events add column if not exists note text;
+alter table point_events drop constraint if exists point_events_reason_check;
+alter table point_events add constraint point_events_reason_check
+  check (reason in ('match_win','match_loss','booking_jogo','booking_aula','admin_adjust'));
+
 -- Segurança: com RLS ligado e nenhuma policy, a chave pública do Supabase não
 -- lê nem escreve nestas tabelas. Só o servidor (conexão direta, DATABASE_URL)
 -- acessa, e ele valida o login e as permissões de cada pedido.
@@ -141,6 +161,24 @@ on conflict (id) do update set
   public = excluded.public,
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
+
+-- Fotos de perfil: mesma regra (só na própria pasta), limite de 5 MB, só imagens.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', true, 5242880, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "avatars_upload_own_folder" on storage.objects;
+create policy "avatars_upload_own_folder" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "avatars_delete_own_files" on storage.objects;
+create policy "avatars_delete_own_files" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
 drop policy if exists "posts_upload_own_folder" on storage.objects;
 create policy "posts_upload_own_folder" on storage.objects

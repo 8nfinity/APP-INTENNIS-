@@ -1,7 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { Avatar, Button, Card, H1, Muted, ProgressBar, Screen, Title } from '@/components/ui';
+import { Avatar, Button, Card, H1, Muted, ProgressBar, Screen, StatTile, Text, Title } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
 import { useAuth, useMe } from '@/lib/auth';
 import { levelFor } from '@/lib/game';
@@ -47,14 +48,30 @@ export default function Perfil() {
     );
 
   return (
-    <Screen refreshing={false} onRefresh={() => { refreshPlayer(); rankQ.reload(); }}>
+    <Screen
+      tab
+      refreshing={false}
+      onRefresh={() => {
+        refreshPlayer();
+        rankQ.reload();
+      }}>
+      <Pressable onPress={() => router.back()} hitSlop={12} style={{ alignSelf: 'flex-start' }}>
+        <Ionicons name="arrow-back" size={24} color={colors.text} />
+      </Pressable>
+
       <View style={s.head}>
-        <Avatar name={me.name} size={92} />
+        <Pressable onPress={() => router.push('/edit-profile')}>
+          <Avatar name={me.name} url={me.avatarUrl} size={110} />
+          <View style={s.camera}>
+            <Ionicons name="camera" size={18} color={colors.onAccent} />
+          </View>
+        </Pressable>
         <H1>{me.name}</H1>
         <Muted>@{me.username}</Muted>
         {!!me.bio && <Text style={s.bio}>{me.bio}</Text>}
         <Muted>{session?.user.email}</Muted>
-        <Button label="Editar perfil" variant="ghost" onPress={() => router.push('/edit-profile')} />
+        <Button label="Editar perfil e foto" variant="ghost" onPress={() => router.push('/edit-profile')} />
+        {me.isAdmin && <Button label="Painel do administrador" arrow onPress={() => router.push('/admin')} style={{ alignSelf: 'stretch' }} />}
       </View>
 
       <Card glow style={{ gap: space.sm }}>
@@ -66,11 +83,11 @@ export default function Perfil() {
         <Muted>{lvl.next ? `${lvl.toNext} pts para ${lvl.next.name}` : 'Você chegou ao topo!'}</Muted>
       </Card>
 
-      <View style={s.stats}>
-        <Stat label="Ranking" value={rank ? `#${rank}` : '-'} />
-        <Stat label="Jogos" value={String(games)} />
-        <Stat label="Vitórias" value={String(me.wins)} />
-        <Stat label="Aulas" value={String(me.classes)} />
+      <View style={s.grid}>
+        <StatTile value={rank ? `#${rank}` : '-'} label="Ranking" accent />
+        <StatTile value={String(games)} label="Jogos" />
+        <StatTile value={String(me.wins)} label="Vitórias" />
+        <StatTile value={String(me.classes)} label="Aulas" />
       </View>
 
       <Title>Conquistas</Title>
@@ -89,24 +106,26 @@ export default function Perfil() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card style={s.stat}>
-      <Text style={s.statValue}>{value}</Text>
-      <Muted>{label}</Muted>
-    </Card>
-  );
-}
-
 const s = StyleSheet.create({
   head: { alignItems: 'center', gap: space.sm },
+  camera: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: colors.bg,
+  },
   bio: { color: colors.text, textAlign: 'center' },
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  level: { fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
-  pts: { color: colors.accent, fontWeight: '900', fontSize: 22 },
-  stats: { flexDirection: 'row', gap: space.sm },
-  stat: { flex: 1, alignItems: 'center', padding: space.md },
-  statValue: { color: colors.text, fontWeight: '900', fontSize: 20 },
+  level: { fontSize: 28, fontWeight: '900', letterSpacing: -1 },
+  pts: { color: colors.accent, fontWeight: '900', fontSize: 24 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   badge: { width: '31%', alignItems: 'center', padding: space.md, gap: 4 },
   badgeText: { color: colors.text, fontSize: 11, textAlign: 'center', fontWeight: '700' },

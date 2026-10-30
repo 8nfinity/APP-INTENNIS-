@@ -32,7 +32,7 @@ async function requireAuth(req, res, next) {
     if (!r.ok) return res.status(401).json({ error: 'Sessão inválida ou expirada' });
     const u = await r.json();
     if (!u || !u.id) return res.status(401).json({ error: 'Sessão inválida' });
-    req.user = { id: u.id, email: u.email };
+    req.user = { id: u.id, email: u.email, confirmed: !!u.email_confirmed_at };
     cache.set(key, { user: req.user, exp: Date.now() + TTL_MS });
     if (cache.size > 5000) cache.clear();
     next();

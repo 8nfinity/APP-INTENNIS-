@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, Share, StyleSheet, View } from 'react-native';
 
-import { Avatar, Button, Card, Empty, ErrorState, H1, Loading, Muted, Screen } from '@/components/ui';
+import { Avatar, Button, Card, Empty, ErrorState, H1, Loading, Muted, Screen, Text } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { timeAgo } from '@/lib/game';
@@ -47,9 +47,11 @@ export default function Social() {
       },
     ]);
 
+  const share = (p: Post) => Share.share({ message: `${p.authorName} no In Tennis Club: ${p.text}` }).catch(() => {});
+
   return (
-    <Screen refreshing={false} onRefresh={reload}>
-      <H1 style={{ fontSize: 34 }}>Social</H1>
+    <Screen tab refreshing={false} onRefresh={reload}>
+      <H1 style={{ fontSize: 40, lineHeight: 42 }}>Social</H1>
       <Button label="Publicar jogo, foto ou vídeo" arrow onPress={() => router.push('/new-post')} />
       {loading && <Loading />}
       {error && <ErrorState message={error} onRetry={reload} />}
@@ -57,18 +59,18 @@ export default function Social() {
         <Empty title="Ninguém postou ainda" hint="Seja o primeiro: conte como foi seu jogo ou mostre aquele ponto." />
       )}
       {data?.posts.map((p) => (
-        <Card key={p.id} style={{ gap: space.md, padding: 0, overflow: 'hidden' }}>
+        <Card key={p.id} style={{ padding: 0, gap: space.md }}>
           <View style={s.head}>
-            <Avatar name={p.authorName} />
+            <Avatar name={p.authorName} url={p.authorAvatarUrl} size={46} />
             <View style={{ flex: 1 }}>
               <Text style={s.name}>{p.authorName}</Text>
               <Muted>
-                @{p.authorUsername} · {timeAgo(p.createdAt)}
+                {timeAgo(p.createdAt)} · @{p.authorUsername}
               </Muted>
             </View>
             {(p.authorId === me?.id || me?.isAdmin) && (
               <Pressable onPress={() => remove(p.id)} hitSlop={10}>
-                <Ionicons name="trash-outline" size={20} color={colors.muted} />
+                <Ionicons name="ellipsis-horizontal" size={22} color={colors.muted} />
               </Pressable>
             )}
           </View>
@@ -76,16 +78,20 @@ export default function Social() {
           {!!p.text && <Text style={s.text}>{p.text}</Text>}
 
           <View style={s.stats}>
-            <View>
+            <View style={s.stat}>
               <Muted>Tipo</Muted>
               <Text style={s.statValue}>{TAG_LABEL[p.tag]}</Text>
             </View>
-            {p.score && (
-              <View>
-                <Muted>Placar</Muted>
-                <Text style={[s.statValue, { color: colors.accent }]}>{p.score}</Text>
-              </View>
-            )}
+            <View style={s.divider} />
+            <View style={s.stat}>
+              <Muted>Placar</Muted>
+              <Text style={[s.statValue, !!p.score && { color: colors.accent }]}>{p.score ?? '-'}</Text>
+            </View>
+            <View style={s.divider} />
+            <View style={s.stat}>
+              <Muted>Kudos</Muted>
+              <Text style={s.statValue}>{p.kudos}</Text>
+            </View>
           </View>
 
           {p.mediaUrl &&
@@ -93,16 +99,14 @@ export default function Social() {
 
           <View style={s.actions}>
             <Pressable onPress={() => kudos(p.id)} style={s.action} hitSlop={8}>
-              <Ionicons
-                name={p.kudosByMe ? 'tennisball' : 'tennisball-outline'}
-                size={24}
-                color={p.kudosByMe ? colors.accent : colors.muted}
-              />
-              <Text style={[s.count, p.kudosByMe && { color: colors.accent }]}>{p.kudos}</Text>
+              <Ionicons name={p.kudosByMe ? 'tennisball' : 'tennisball-outline'} size={28} color={p.kudosByMe ? colors.accent : colors.text} />
             </Pressable>
             <Pressable onPress={() => router.push({ pathname: '/comments', params: { postId: p.id } })} style={s.action} hitSlop={8}>
-              <Ionicons name="chatbubble-outline" size={22} color={colors.muted} />
+              <Ionicons name="chatbubble-outline" size={26} color={colors.text} />
               <Text style={s.count}>{p.comments}</Text>
+            </Pressable>
+            <Pressable onPress={() => share(p)} style={s.action} hitSlop={8}>
+              <Ionicons name="share-outline" size={28} color={colors.text} />
             </Pressable>
           </View>
         </Card>
@@ -113,12 +117,14 @@ export default function Social() {
 
 const s = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, paddingBottom: 0 },
-  name: { color: colors.text, fontWeight: '800', fontSize: 15 },
-  text: { color: colors.text, fontSize: 15, lineHeight: 22, paddingHorizontal: space.lg },
-  stats: { flexDirection: 'row', gap: 32, paddingHorizontal: space.lg },
+  name: { color: colors.text, fontWeight: '800', fontSize: 16 },
+  text: { color: colors.text, fontSize: 18, fontWeight: '700', lineHeight: 24, letterSpacing: -0.3, paddingHorizontal: space.lg },
+  stats: { flexDirection: 'row', paddingHorizontal: space.lg, alignItems: 'center' },
+  stat: { flex: 1, gap: 2 },
+  divider: { width: 1, height: 34, backgroundColor: colors.border, marginRight: space.md },
   statValue: { color: colors.text, fontWeight: '900', fontSize: 20, letterSpacing: -0.5 },
-  media: { width: '100%', height: 300, backgroundColor: colors.cardAlt, borderRadius: radius.sm },
-  actions: { flexDirection: 'row', gap: space.xl, padding: space.lg, paddingTop: 0 },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  media: { width: '100%', height: 320, backgroundColor: colors.cardAlt, borderRadius: radius.sm },
+  actions: { flexDirection: 'row', justifyContent: 'space-around', padding: space.lg, paddingTop: space.xs, borderTopWidth: 1, borderTopColor: colors.border },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
   count: { color: colors.muted, fontWeight: '800' },
 });
