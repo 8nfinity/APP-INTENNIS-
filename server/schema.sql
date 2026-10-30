@@ -75,6 +75,17 @@ create table if not exists events (
   place text not null default ''
 );
 
+-- Segurança: sem RLS, qualquer pessoa com a chave pública (sb_publishable_...)
+-- lê e escreve nestas tabelas. Com RLS ligado e sem policies, só o servidor
+-- (conexão direta ao Postgres, DATABASE_URL) consegue acessar.
+alter table players  enable row level security;
+alter table courts   enable row level security;
+alter table bookings enable row level security;
+alter table matches  enable row level security;
+alter table posts    enable row level security;
+alter table kudos    enable row level security;
+alter table events   enable row level security;
+
 insert into courts (id, name, surface, price_per_hour) values
   ('c1','Quadra 1','Saibro',80),
   ('c2','Quadra 2','Saibro',80),
