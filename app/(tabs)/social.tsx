@@ -1,124 +1,108 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { Image, Pressable, Share, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Avatar, Button, Card, Empty, ErrorState, H1, Loading, Muted, Screen, Text } from '@/components/ui';
-import { api, errMsg, useFetch } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
-import { confirmAsk, notify } from '@/lib/dialog';
-import { timeAgo } from '@/lib/game';
-import { colors, radius, space } from '@/lib/theme';
+import { Logo } from '@/components/Logo';
+import { PostCard } from '@/components/PostCard';
+import { Avatar, Empty, ErrorState, Loading, Muted, RoundButton, Screen, Text } from '@/components/ui';
+import { useFetch } from '@/lib/api';
+import { useMe } from '@/lib/auth';
+import { avatarColor } from '@/lib/game';
+import { colors, space } from '@/lib/theme';
 import { Post } from '@/lib/types';
 
-const TAG_LABEL = { jogo: 'Jogo', treino: 'Treino', foto: 'Foto', video: 'Vídeo' } as const;
-
-function VideoBox({ uri }: { uri: string }) {
-  const player = useVideoPlayer(uri);
-  return <VideoView player={player} style={s.media} nativeControls contentFit="cover" />;
-}
-
 export default function Social() {
-  const { player: me } = useAuth();
+  const me = useMe();
   const { data, error, loading, reload } = useFetch<{ posts: Post[] }>('/posts');
+  const [author, setAuthor] = useState<string | null>(null);
+  const posts = data?.posts ?? [];
 
-  const kudos = async (id: string) => {
-    try {
-      await api(`/posts/${id}/kudos`, { method: 'POST' });
-      reload();
-    } catch (e) {
-      notify('Kudos', errMsg(e));
-    }
-  };
-
-  const remove = async (id: string) => {
-    if (!(await confirmAsk('Apagar publicação?', 'Essa ação não pode ser desfeita.', 'Apagar', true))) return;
-    try {
-      await api(`/posts/${id}`, { method: 'DELETE' });
-      reload();
-    } catch (e) {
-      notify('Erro', errMsg(e));
-    }
-  };
-
-  const share = (p: Post) => Share.share({ message: `${p.authorName} no In Tennis Club: ${p.text}` }).catch(() => {});
+  // "Stories": quem postou recentemente, com a mídia mais recente de cada um
+  const stories: Post[] = [];
+  for (const p of posts) if (!stories.some((x) => x.authorId === p.authorId)) stories.push(p);
+  const shown = author ? posts.filter((p) => p.authorId === author) : posts;
 
   return (
-    <Screen tab refreshing={false} onRefresh={reload}>
-      <H1 style={{ fontSize: 40, lineHeight: 42 }}>Social</H1>
-      <Button label="Publicar jogo, foto ou vídeo" arrow onPress={() => router.push('/new-post')} />
-      {loading && <Loading />}
-      {error && <ErrorState message={error} onRetry={reload} />}
-      {data && data.posts.length === 0 && (
-        <Empty title="Ninguém postou ainda" hint="Seja o primeiro: conte como foi seu jogo ou mostre aquele ponto." />
-      )}
-      {data?.posts.map((p) => (
-        <Card key={p.id} style={{ padding: 0, gap: space.md }}>
-          <View style={s.head}>
-            <Avatar name={p.authorName} url={p.authorAvatarUrl} size={46} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.name}>{p.authorName}</Text>
-              <Muted>
-                {timeAgo(p.createdAt)} · @{p.authorUsername}
-              </Muted>
-            </View>
-            {(p.authorId === me?.id || me?.isAdmin) && (
-              <Pressable onPress={() => remove(p.id)} hitSlop={10}>
-                <Ionicons name="ellipsis-horizontal" size={22} color={colors.muted} />
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Screen tab refreshing={false} onRefresh={reload}>
+        <View style={s.top}>
+          <RoundButton icon="add" onPress={() => router.push('/new-post')} />
+          <Logo size={16} />
+          <Pressable onPress={() => router.push('/perfil')}>
+            <Avatar name={me.name} url={me.avatarUrl} size={44} />
+          </Pressable>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: space.lg }}>
+          <Pressable onPress={() => router.push('/new-post')} style={[s.story, s.storyNew]}>
+            <Ionicons name="add" size={30} color={colors.cream} />
+            <Text style={s.storyNewText}>Publicar</Text>
+          </Pressable>
+          {stories.map((p) => {
+            const on = author === p.authorId;
+            return (
+              <Pressable key={p.authorId} onPress={() => setAuthor(on ? null : p.authorId)} style={[s.story, on && s.storyOn]}>
+                {p.mediaUrl && p.tag !== 'video' ? (
+                  <Image source={{ uri: p.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                ) : (
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: avatarColor(p.authorName), opacity: 0.35 }]} />
+                )}
+                <View style={s.storyAvatar}>
+                  <Avatar name={p.authorName} url={p.authorAvatarUrl} size={36} ring={colors.bg} />
+                </View>
               </Pressable>
-            )}
-          </View>
+            );
+          })}
+        </ScrollView>
+        {author && (
+          <Pressable onPress={() => setAuthor(null)}>
+            <Muted>
+              Mostrando só {stories.find((p) => p.authorId === author)?.authorName}. <Text style={{ color: colors.cream, fontWeight: '600' }}>Ver todos</Text>
+            </Muted>
+          </Pressable>
+        )}
 
-          {!!p.text && <Text style={s.text}>{p.text}</Text>}
+        {loading && <Loading />}
+        {error && <ErrorState message={error} onRetry={reload} />}
+        {data && posts.length === 0 && <Empty title="Ninguém postou ainda" hint="Seja o primeiro: conte como foi seu jogo ou mostre aquele ponto." />}
 
-          <View style={s.stats}>
-            <View style={s.stat}>
-              <Muted>Tipo</Muted>
-              <Text style={s.statValue}>{TAG_LABEL[p.tag]}</Text>
-            </View>
-            <View style={s.divider} />
-            <View style={s.stat}>
-              <Muted>Placar</Muted>
-              <Text style={[s.statValue, !!p.score && { color: colors.accent }]}>{p.score ?? '-'}</Text>
-            </View>
-            <View style={s.divider} />
-            <View style={s.stat}>
-              <Muted>Kudos</Muted>
-              <Text style={s.statValue}>{p.kudos}</Text>
-            </View>
-          </View>
+        <View style={{ gap: space.xl + 8 }}>
+          {shown.map((p) => (
+            <PostCard key={p.id} post={p} canDelete={p.authorId === me.id || me.isAdmin} onChanged={reload} />
+          ))}
+        </View>
+      </Screen>
 
-          {p.mediaUrl &&
-            (p.tag === 'video' ? <VideoBox uri={p.mediaUrl} /> : <Image source={{ uri: p.mediaUrl }} style={s.media} resizeMode="cover" />)}
-
-          <View style={s.actions}>
-            <Pressable onPress={() => kudos(p.id)} style={s.action} hitSlop={8}>
-              <Ionicons name={p.kudosByMe ? 'tennisball' : 'tennisball-outline'} size={28} color={p.kudosByMe ? colors.accent : colors.text} />
-            </Pressable>
-            <Pressable onPress={() => router.push({ pathname: '/comments', params: { postId: p.id } })} style={s.action} hitSlop={8}>
-              <Ionicons name="chatbubble-outline" size={26} color={colors.text} />
-              <Text style={s.count}>{p.comments}</Text>
-            </Pressable>
-            <Pressable onPress={() => share(p)} style={s.action} hitSlop={8}>
-              <Ionicons name="share-outline" size={28} color={colors.text} />
-            </Pressable>
-          </View>
-        </Card>
-      ))}
-    </Screen>
+      {/* botão flutuante de publicar, como os botões redondos da referência */}
+      <Pressable onPress={() => router.push('/new-post')} style={s.fab}>
+        <Ionicons name="camera" size={24} color={colors.onAccent} />
+      </Pressable>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, paddingBottom: 0 },
-  name: { color: colors.text, fontWeight: '800', fontSize: 16 },
-  text: { color: colors.text, fontSize: 18, fontWeight: '700', lineHeight: 24, letterSpacing: -0.3, paddingHorizontal: space.lg },
-  stats: { flexDirection: 'row', paddingHorizontal: space.lg, alignItems: 'center' },
-  stat: { flex: 1, gap: 2 },
-  divider: { width: 1, height: 34, backgroundColor: colors.border, marginRight: space.md },
-  statValue: { color: colors.text, fontWeight: '900', fontSize: 20, letterSpacing: -0.5 },
-  media: { width: '100%', height: 320, backgroundColor: colors.cardAlt, borderRadius: radius.sm },
-  actions: { flexDirection: 'row', justifyContent: 'space-around', padding: space.lg, paddingTop: space.xs, borderTopWidth: 1, borderTopColor: colors.border },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
-  count: { color: colors.muted, fontWeight: '800' },
+  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  story: { width: 76, height: 104, borderRadius: 38, overflow: 'hidden', backgroundColor: colors.cardAlt, borderWidth: 2, borderColor: 'rgba(244,243,236,0.15)', justifyContent: 'flex-end', alignItems: 'center' },
+  storyOn: { borderColor: colors.cream },
+  storyNew: { justifyContent: 'center', borderStyle: 'dashed', borderColor: 'rgba(244,243,236,0.35)', gap: 4 },
+  storyNewText: { fontSize: 11, fontWeight: '600' },
+  storyAvatar: { marginBottom: 8 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.cream,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
 });

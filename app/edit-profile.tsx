@@ -2,74 +2,44 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
-import { Avatar, Button, ErrorText, Field, Muted, Screen } from '@/components/ui';
+import { Avatar, Button, ErrorText, FormRow, Header, ListGroup, Muted, Screen } from '@/components/ui';
 import { api, errMsg } from '@/lib/api';
 import { useAuth, useMe } from '@/lib/auth';
-import { notify } from '@/lib/dialog';
-import { IMAGE_TYPES, uploadAsset } from '@/lib/media';
+import { confirmAsk, notify } from '@/lib/dialog';
+import { setPendingImage } from '@/lib/pending';
 import { colors, space } from '@/lib/theme';
 
+// Editar perfil (referência "Edit Profile"): foto com câmera, campos em lista, salvar e excluir conta.
 export default function EditProfile() {
   const me = useMe();
-  const { refreshPlayer, session } = useAuth();
+  const { refreshPlayer, session, signOut } = useAuth();
   const [name, setName] = useState(me.name);
   const [username, setUsername] = useState(me.username);
   const [bio, setBio] = useState(me.bio);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(me.avatarUrl);
-  const [photoBusy, setPhotoBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // A foto é enviada e salva na hora, sem precisar apertar "Salvar".
-  const changePhoto = async () => {
-    if (!session) return;
+  // escolhe a foto e abre a tela de ajuste (arrastar + zoom)
+  const pickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      notify('Permissão necessária', 'Autorize o acesso às fotos para escolher sua foto de perfil.');
-      return;
-    }
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
+    if (!perm.granted) return notify('Permissão necessária', 'Autorize o acesso às fotos para escolher sua foto de perfil.');
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (res.canceled) return;
     const a = res.assets[0];
-    const mime = a.mimeType && IMAGE_TYPES[a.mimeType] ? a.mimeType : 'image/jpeg';
-    setPhotoBusy(true);
-    setError(null);
-    try {
-      const url = await uploadAsset({
-        bucket: 'avatars',
-        userId: session.user.id,
-        uri: a.uri,
-        mime,
-        ext: IMAGE_TYPES[mime],
-        maxBytes: 5 * 1024 * 1024,
-      });
-      await api('/me', { method: 'PATCH', body: { avatarUrl: url } });
-      setAvatarUrl(url);
-      await refreshPlayer();
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setPhotoBusy(false);
-    }
+    const size = a.width && a.height ? { width: a.width, height: a.height } : await getSize(a.uri);
+    setPendingImage({ uri: a.uri, ...size });
+    router.push('/avatar-crop');
   };
 
   const removePhoto = async () => {
-    setPhotoBusy(true);
+    if (!(await confirmAsk('Remover foto?', 'Seu perfil volta a mostrar as iniciais.', 'Remover', true))) return;
     try {
       await api('/me', { method: 'PATCH', body: { avatarUrl: null } });
-      setAvatarUrl(null);
       await refreshPlayer();
     } catch (e) {
       setError(errMsg(e));
-    } finally {
-      setPhotoBusy(false);
     }
   };
 
@@ -89,40 +59,71 @@ export default function EditProfile() {
     }
   };
 
+  const deleteAccount = async () => {
+    const ok = await confirmAsk('Excluir conta?', 'Seu perfil, reservas, jogos e posts serão apagados. Isso não pode ser desfeito.', 'Excluir', true);
+    if (!ok) return;
+    try {
+      await api('/me', { method: 'DELETE' });
+      await signOut();
+    } catch (e) {
+      notify('Erro', errMsg(e));
+    }
+  };
+
   return (
-    <Screen padTop={false}>
+    <Screen>
+      <Header title="Editar perfil" />
+
       <View style={s.photo}>
-        <Pressable onPress={changePhoto} disabled={photoBusy}>
-          <Avatar name={name || me.name} url={avatarUrl} size={120} />
+        <Pressable onPress={pickPhoto}>
+          <Avatar name={name || me.name} url={me.avatarUrl} size={112} />
           <View style={s.camera}>
-            <Ionicons name={photoBusy ? 'hourglass' : 'camera'} size={20} color={colors.onAccent} />
+            <Ionicons name="camera" size={17} color={colors.onAccent} />
           </View>
         </Pressable>
-        <Button label={photoBusy ? 'Enviando...' : 'Trocar foto'} variant="ghost" onPress={changePhoto} disabled={photoBusy} />
-        {avatarUrl && <Button label="Remover foto" variant="danger" onPress={removePhoto} disabled={photoBusy} />}
-        <Muted>JPG, PNG ou WEBP de até 5 MB.</Muted>
+        <View style={{ flexDirection: 'row', gap: space.lg }}>
+          <Pressable onPress={pickPhoto} hitSlop={8}>
+            <Muted style={{ color: colors.cream, fontWeight: '600' }}>Trocar e ajustar foto</Muted>
+          </Pressable>
+          {me.avatarUrl && (
+            <Pressable onPress={removePhoto} hitSlop={8}>
+              <Muted style={{ color: colors.danger }}>Remover</Muted>
+            </Pressable>
+          )}
+        </View>
       </View>
 
-      <Field label="Nome" value={name} onChangeText={setName} maxLength={60} />
-      <Field label="Usuário" value={username} onChangeText={(t) => setUsername(t.toLowerCase())} autoCapitalize="none" maxLength={20} />
-      <Muted>Só letras minúsculas, números, ponto e underline.</Muted>
-      <Field label="Bio" value={bio} onChangeText={setBio} multiline maxLength={160} />
+      <ListGroup>
+        <FormRow label="Nome" value={name} onChangeText={setName} maxLength={60} />
+        <FormRow label="Usuário" value={username} onChangeText={(t) => setUsername(t.toLowerCase())} autoCapitalize="none" maxLength={20} />
+        <FormRow label="Bio" value={bio} onChangeText={setBio} maxLength={160} placeholder="Seu estilo de jogo" />
+        <FormRow label="E-mail" value={session?.user.email ?? ''} editable={false} last />
+      </ListGroup>
+      <Muted>Usuário: só letras minúsculas, números, ponto e underline.</Muted>
+
       <ErrorText>{error}</ErrorText>
-      <Button label="Salvar" loading={busy} onPress={save} />
+      <Button label="Salvar alterações" loading={busy} onPress={save} style={{ borderRadius: 999 }} />
+
+      <View style={{ minHeight: space.xl * 2 }} />
+      <Button label="Excluir conta" variant="dark" onPress={deleteAccount} style={{ borderRadius: 999 }} />
     </Screen>
   );
 }
 
+function getSize(uri: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => Image.getSize(uri, (width, height) => resolve({ width, height }), reject));
+}
+
 const s = StyleSheet.create({
-  photo: { alignItems: 'center', gap: space.sm },
+  photo: { alignItems: 'center', gap: space.md },
   camera: {
     position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.accent,
+    right: 2,
+    bottom: 2,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.cream,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,

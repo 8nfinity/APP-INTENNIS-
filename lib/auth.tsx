@@ -34,7 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [player, setPlayer] = useState<Player | null>(null);
   const [ready, setReady] = useState(false); // sessão local lida
-  const [profileLoading, setProfileLoading] = useState(false);
+  // de qual usuário o perfil já foi buscado: até lá o app fica carregando, sem
+  // cair por engano na tela de "criar perfil" nem perder a tela atual.
+  const [checkedFor, setCheckedFor] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -53,7 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPlayer(null);
       return;
     }
-    setProfileLoading(true);
     try {
       const res = await api<{ player: Player | null }>('/me');
       setPlayer(res.player);
@@ -61,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       setProfileError(errMsg(e));
     } finally {
-      setProfileLoading(false);
+      setCheckedFor(userId);
     }
   }, [userId]);
 
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       player,
-      loading: !ready || (!!userId && !player && profileLoading),
+      loading: !ready || (!!userId && checkedFor !== userId),
       profileError,
       signIn: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       refreshPlayer,
     }),
-    [session, player, ready, userId, profileLoading, profileError, refreshPlayer],
+    [session, player, ready, userId, checkedFor, profileError, refreshPlayer],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

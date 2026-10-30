@@ -425,6 +425,8 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
   // ---------- social ----------
   r.get('/posts', wrap(async (req, res) => {
     const p = await needMe(req);
+    // ?author=<id do jogador> filtra as publicações de uma pessoa (usado no perfil)
+    const author = typeof req.query.author === 'string' && UUID.test(req.query.author) ? req.query.author : null;
     const { rows } = await pool.query(
       `select po.id, po.text, po.media_url as "mediaUrl", po.tag, po.score, po.created_at as "createdAt",
               a.id as "authorId", a.name as "authorName", a.username as "authorUsername", a.avatar_url as "authorAvatarUrl",
@@ -432,8 +434,9 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
               exists(select 1 from kudos k where k.post_id = po.id and k.player_id = $1) as "kudosByMe",
               (select count(*) from comments c where c.post_id = po.id)::int as comments
        from posts po join players a on a.id = po.author_id
+       where ($2::uuid is null or po.author_id = $2::uuid)
        order by po.created_at desc limit 50`,
-      [p.id],
+      [p.id, author],
     );
     res.json({ posts: rows });
   }));

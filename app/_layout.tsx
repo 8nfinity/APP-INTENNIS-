@@ -104,9 +104,11 @@ function RootNav() {
       </Stack.Protected>
       <Stack.Protected guard={authed}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="checkout" options={{ headerShown: true, ...modal('Pagamento') }} />
+        <Stack.Screen name="checkout" />
         <Stack.Screen name="new-post" options={{ headerShown: true, ...modal('Nova publicação') }} />
-        <Stack.Screen name="edit-profile" options={{ headerShown: true, ...modal('Editar perfil') }} />
+        <Stack.Screen name="edit-profile" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="avatar-crop" options={{ presentation: 'modal' }} />
         <Stack.Screen name="match-result" options={{ headerShown: true, ...modal('Registrar resultado') }} />
         <Stack.Screen name="comments" options={{ headerShown: true, ...modal('Comentários') }} />
       </Stack.Protected>

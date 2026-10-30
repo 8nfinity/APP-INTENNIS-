@@ -1,39 +1,59 @@
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Svg, { Polygon } from 'react-native-svg';
 
-import { Avatar, Button, Card, Chip, Empty, ErrorState, H1, Loading, Muted, ProgressBar, Screen, Text, Title } from '@/components/ui';
+import { Avatar, Button, Card, Empty, ErrorState, Loading, Muted, RoundButton, Screen, Section, Segmented, Text } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { notify } from '@/lib/dialog';
-import { POINTS, TOURNAMENT_SPOTS, levelFor } from '@/lib/game';
-import { colors, radius, space } from '@/lib/theme';
+import { confirmAsk, notify } from '@/lib/dialog';
+import { POINTS, TOURNAMENT_SPOTS } from '@/lib/game';
+import { colors, space } from '@/lib/theme';
 import { MatchRow, Player } from '@/lib/types';
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+const MEDAL = [colors.gold, colors.silver, colors.bronze];
+const PILL: [string, string][] = [
+  ['#C8E64A', '#7FD39A'],
+  ['#9AD9B4', '#C8E64A'],
+  ['#E9C46A', '#E8955F'],
+];
 
-function Podium({ players, score }: { players: Player[]; score: (p: Player) => number }) {
-  const order = [players[1], players[0], players[2]]; // 2º, 1º, 3º
-  const heights = [92, 124, 76];
+// Bloco 3D do pódio: face de cima (trapézio) + frente em degradê com o número grande.
+function Block({ n, height }: { n: number; height: number }) {
+  const W = 100;
   return (
-    <View style={s.podium}>
-      {order.map((p, i) => {
-        const rank = i === 1 ? 0 : i === 0 ? 1 : 2;
-        if (!p) return <View key={i} style={{ flex: 1 }} />;
-        return (
-          <View key={p.id} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: 22 }}>{MEDALS[rank]}</Text>
-            <Avatar name={p.name} url={p.avatarUrl} size={rank === 0 ? 68 : 54} />
-            <Text style={s.podName} numberOfLines={1}>
-              {p.name.split(' ')[0]}
-            </Text>
-            <View style={[s.bar, { height: heights[i] }, rank === 0 && s.barFirst]}>
-              <Text style={[s.barPts, rank === 0 && { color: colors.onAccent }]}>{score(p)}</Text>
-              <Text style={[s.barLabel, rank === 0 && { color: colors.onAccent }]}>pts</Text>
-            </View>
-          </View>
-        );
-      })}
+    <View style={{ width: '100%' }}>
+      <Svg width="100%" height={16} viewBox={`0 0 ${W} 16`} preserveAspectRatio="none">
+        <Polygon points={`10,0 ${W - 10},0 ${W},16 0,16`} fill="#2C4434" />
+      </Svg>
+      <LinearGradient colors={['#253A2B', 'rgba(37,58,43,0)']} style={{ height, alignItems: 'center', paddingTop: 10 }}>
+        <Text style={s.blockNum}>{n}</Text>
+      </LinearGradient>
+    </View>
+  );
+}
+
+function PodiumSpot({ p, rank, score }: { p?: Player; rank: number; score: number }) {
+  const heights = [150, 116, 92];
+  if (!p) return <View style={{ flex: 1 }} />;
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <View>
+        <Avatar name={p.name} url={p.avatarUrl} size={rank === 0 ? 78 : 62} ring={MEDAL[rank]} />
+        <View style={[s.medal, { backgroundColor: MEDAL[rank] }]}>
+          {rank === 0 ? <Ionicons name="trophy" size={13} color="#1A1A1A" /> : <Text style={s.medalText}>{rank + 1}</Text>}
+        </View>
+      </View>
+      <Text style={s.podName} numberOfLines={1}>
+        {p.username}
+      </Text>
+      <LinearGradient colors={PILL[rank]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.pill}>
+        <Text style={s.pillText}>{score} pts</Text>
+      </LinearGradient>
+      <View style={{ height: 10 }} />
+      <Block n={rank + 1} height={heights[rank]} />
     </View>
   );
 }
@@ -51,20 +71,20 @@ export default function Ranking() {
   };
 
   if (!me) return null;
-  if (rankQ.loading) return <Screen tab><Loading /></Screen>;
 
   const score = (p: Player) => (period === 'geral' ? p.points : p.monthPoints);
   const sorted = [...(rankQ.data?.players ?? [])].sort((a, b) => score(b) - score(a));
   const myPos = sorted.findIndex((p) => p.id === me.id) + 1;
-  const lvl = levelFor(me.points);
   const cutoff = sorted[TOURNAMENT_SPOTS - 1];
   const gap = cutoff && myPos > TOURNAMENT_SPOTS ? Math.max(0, score(cutoff) - score(me) + 1) : 0;
   const matches = (matchQ.data?.matches ?? []).filter((m) => m.status === 'agendado' || m.status === 'aguardando_confirmacao');
 
   const challenge = async (p: Player) => {
+    if (p.id === me.id) return;
+    if (!(await confirmAsk(`Desafiar ${p.name}?`, `Combinem o jogo. Vitória vale +${POINTS.vitoria} pontos e derrota +${POINTS.derrota}.`, 'Desafiar'))) return;
     try {
       await api('/matches', { method: 'POST', body: { opponentId: p.id } });
-      notify('Desafio criado! ⚔️', `Combinem o jogo com ${p.name}. Vitória vale +${POINTS.vitoria} pontos.`);
+      notify('Desafio criado! ⚔️', 'Depois do jogo, informe o resultado aqui no ranking.');
       matchQ.reload();
     } catch (e) {
       notify('Desafio', errMsg(e));
@@ -80,82 +100,84 @@ export default function Ranking() {
     }
   };
 
+  const rules = () =>
+    notify(
+      'Como ganhar pontos',
+      `Vitória +${POINTS.vitoria}\nDerrota +${POINTS.derrota}\nAula (check-in) +${POINTS.aula}\nJogo reservado (check-in) +${POINTS.jogoAgendado}\n\nOs ${TOURNAMENT_SPOTS} primeiros são convidados para o torneio.`,
+    );
+
   return (
     <Screen tab refreshing={false} onRefresh={reload}>
-      <H1 style={{ fontSize: 40, lineHeight: 42 }}>Ranking</H1>
-
-      {rankQ.error && <ErrorState message={rankQ.error} onRetry={rankQ.reload} />}
-
-      <View style={s.row}>
-        <Chip label="Geral" active={period === 'geral'} onPress={() => setPeriod('geral')} />
-        <Chip label="Este mês" active={period === 'mes'} onPress={() => setPeriod('mes')} />
+      <View style={s.head}>
+        <Text style={s.title}>Ranking</Text>
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <RoundButton icon="information-circle-outline" onPress={rules} />
+          <RoundButton icon="person-circle-outline" onPress={() => router.push('/perfil')} />
+        </View>
       </View>
 
-      {sorted.length > 0 && <Podium players={sorted.slice(0, 3)} score={score} />}
+      <Segmented
+        options={[
+          { key: 'geral', label: 'Geral' },
+          { key: 'mes', label: 'Este mês' },
+        ]}
+        value={period}
+        onChange={setPeriod}
+      />
 
-      <Card glow style={{ gap: space.sm }}>
-        <View style={s.between}>
-          <View>
-            <Muted>Sua posição</Muted>
-            <Text style={s.pos}>#{myPos || '-'}</Text>
-          </View>
-          <View style={[s.badge, { borderColor: lvl.current.color }]}>
-            <Text style={{ color: lvl.current.color, fontWeight: '900' }}>{lvl.current.name}</Text>
-          </View>
+      {rankQ.loading && <Loading />}
+      {rankQ.error && <ErrorState message={rankQ.error} onRetry={rankQ.reload} />}
+
+      {sorted.length > 0 && (
+        <View style={s.podium}>
+          <PodiumSpot p={sorted[1]} rank={1} score={sorted[1] ? score(sorted[1]) : 0} />
+          <PodiumSpot p={sorted[0]} rank={0} score={score(sorted[0])} />
+          <PodiumSpot p={sorted[2]} rank={2} score={sorted[2] ? score(sorted[2]) : 0} />
         </View>
-        <ProgressBar value={lvl.progress} color={lvl.current.color} />
-        <Muted>
-          {lvl.next ? `Faltam ${lvl.toNext} pts para ${lvl.next.name}` : 'Nível máximo!'} · {me.points} pts
-        </Muted>
-        <Text style={s.tournament}>
-          🏆{' '}
-          {myPos > 0 && myPos <= TOURNAMENT_SPOTS
-            ? 'Você está na zona do torneio! Mantenha a posição.'
-            : gap > 0
-              ? `Faltam ${gap} pts para entrar no top ${TOURNAMENT_SPOTS} e ser convidado ao torneio.`
-              : `Os ${TOURNAMENT_SPOTS} primeiros do ranking são convidados ao torneio.`}
-        </Text>
-      </Card>
+      )}
 
-      <Card>
-        <Title>Como ganhar pontos</Title>
-        <Muted style={{ marginTop: 6 }}>
-          Vitória +{POINTS.vitoria} · Derrota +{POINTS.derrota} · Aula +{POINTS.aula} · Jogo reservado (check-in) +{POINTS.jogoAgendado}
-        </Muted>
+      <Card glow style={s.mine}>
+        <View style={{ flex: 1 }}>
+          <Muted>Sua posição</Muted>
+          <Text style={{ fontSize: 26, fontWeight: '800' }}>#{myPos || '-'}</Text>
+        </View>
+        <Text style={s.mineHint}>
+          {myPos > 0 && myPos <= TOURNAMENT_SPOTS
+            ? '🏆 Você está na zona do torneio'
+            : gap > 0
+              ? `Faltam ${gap} pts para o top ${TOURNAMENT_SPOTS}`
+              : `Top ${TOURNAMENT_SPOTS} vai ao torneio`}
+        </Text>
       </Card>
 
       {matches.length > 0 && (
         <View style={{ gap: space.sm }}>
-          <Title>Seus jogos</Title>
+          <Section>Seus jogos</Section>
           {matches.map((m) => {
             const waitingMe = m.status === 'aguardando_confirmacao' && m.reportedBy !== me.id;
             const waitingThem = m.status === 'aguardando_confirmacao' && m.reportedBy === me.id;
             return (
               <Card key={m.id} style={{ gap: space.md }}>
-                <View style={s.between}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
                   <Avatar name={m.otherName} url={m.otherAvatarUrl} />
-                  <View style={{ flex: 1, marginLeft: space.md }}>
-                    <Text style={s.name}>vs {m.otherName}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontWeight: '700' }}>vs {m.otherName}</Text>
                     <Muted>
                       {m.status === 'agendado'
                         ? 'Jogo marcado'
                         : waitingThem
                           ? 'Aguardando o adversário confirmar'
-                          : `Resultado informado: ${m.winnerId === me.id ? 'você venceu' : 'você perdeu'} ${m.score ?? ''}`}
+                          : `Resultado: ${m.winnerId === me.id ? 'você venceu' : 'você perdeu'} ${m.score ?? ''}`}
                     </Muted>
                   </View>
                 </View>
                 {m.status === 'agendado' && (
-                  <Button
-                    label="Informar resultado"
-                    variant="ghost"
-                    onPress={() => router.push({ pathname: '/match-result', params: { matchId: m.id, name: m.otherName } })}
-                  />
+                  <Button label="Informar resultado" variant="ghost" onPress={() => router.push({ pathname: '/match-result', params: { matchId: m.id, name: m.otherName } })} />
                 )}
                 {waitingMe && (
-                  <View style={s.between}>
+                  <View style={{ flexDirection: 'row', gap: space.sm }}>
                     <Button label="Confirmar" onPress={() => confirm(m, true)} style={{ flex: 1 }} />
-                    <Button label="Contestar" variant="danger" onPress={() => confirm(m, false)} style={{ flex: 1, marginLeft: space.sm }} />
+                    <Button label="Contestar" variant="danger" onPress={() => confirm(m, false)} style={{ flex: 1 }} />
                   </View>
                 )}
               </Card>
@@ -164,59 +186,61 @@ export default function Ranking() {
         </View>
       )}
 
-      {sorted.length <= 1 && (
-        <Empty title="Você abre o ranking" hint="Chame a galera para o app. Quando outros jogadores entrarem, eles aparecem aqui." />
-      )}
+      {sorted.length <= 1 && !rankQ.loading && <Empty title="Você abre o ranking" hint="Quando outros jogadores entrarem, eles aparecem aqui." />}
 
-      <View style={{ gap: space.sm }}>
-        {sorted.map((p, i) => (
-          <View key={p.id}>
-            {i === TOURNAMENT_SPOTS && <Text style={s.cutLine}>— linha de corte do torneio —</Text>}
-            <Card style={[s.rowCard, p.id === me.id && s.mine, i < TOURNAMENT_SPOTS && s.zone]}>
-              <Text style={s.rank}>{i < 3 ? MEDALS[i] : i + 1}</Text>
-              <Avatar name={p.name} url={p.avatarUrl} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.name}>{p.name}</Text>
-                <Muted>
-                  @{p.username} · {p.wins}V {p.losses}D{p.streak >= 3 ? ` · 🔥${p.streak}` : ''}
-                </Muted>
-              </View>
-              <Text style={s.pts}>{score(p)}</Text>
-              {p.id !== me.id && <Button label="⚔️" variant="ghost" onPress={() => challenge(p)} style={s.sword} />}
-            </Card>
-          </View>
-        ))}
+      <View>
+        {sorted.slice(3).map((p, i) => {
+          const pos = i + 4;
+          return (
+            <View key={p.id}>
+              {pos === TOURNAMENT_SPOTS + 1 && <Text style={s.cut}>linha de corte do torneio</Text>}
+              <Pressable onPress={() => challenge(p)} style={[s.row, p.id === me.id && s.rowMine]}>
+                <View style={s.rank}>
+                  <Ionicons name="trophy-outline" size={13} color={colors.muted} />
+                  <Text style={s.rankText}>{pos}</Text>
+                </View>
+                <Avatar name={p.name} url={p.avatarUrl} size={46} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.name} numberOfLines={1}>
+                    {p.name}
+                  </Text>
+                  <Muted>@{p.username}</Muted>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="star" size={15} color={colors.gold} />
+                    <Text style={s.pts}>{score(p)}</Text>
+                  </View>
+                  {p.monthPoints > 0 && <Text style={s.delta}>+{p.monthPoints} no mês</Text>}
+                </View>
+              </Pressable>
+            </View>
+          );
+        })}
       </View>
+      {sorted.length > 3 && <Muted style={{ textAlign: 'center' }}>Toque num jogador para desafiá-lo</Muted>}
     </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  podium: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, marginTop: space.sm },
-  podName: { color: colors.text, fontWeight: '800', fontSize: 14 },
-  bar: {
-    width: '100%',
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(244,243,236,0.08)',
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  barFirst: { backgroundColor: colors.accent, borderColor: colors.accent },
-  barPts: { color: colors.text, fontSize: 26, fontWeight: '900', letterSpacing: -1 },
-  barLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  pos: { color: colors.accent, fontSize: 56, fontWeight: '900', letterSpacing: -2.5, lineHeight: 60 },
-  badge: { borderWidth: 2, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 6 },
-  tournament: { color: colors.text, fontWeight: '700', marginTop: space.xs },
-  row: { flexDirection: 'row', gap: space.sm },
-  rowCard: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md },
-  mine: { borderColor: colors.accent },
-  zone: { borderLeftWidth: 4, borderLeftColor: colors.accent },
-  rank: { color: colors.muted, width: 30, textAlign: 'center', fontWeight: '900', fontSize: 16 },
-  name: { color: colors.text, fontWeight: '800', fontSize: 15 },
-  pts: { color: colors.accent, fontWeight: '900', fontSize: 18 },
-  cutLine: { color: colors.hot, textAlign: 'center', fontWeight: '700', marginVertical: space.sm, fontSize: 12 },
-  sword: { paddingVertical: 8, paddingHorizontal: 12, minHeight: 40 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { fontSize: 34, fontWeight: '800', letterSpacing: -1 },
+  podium: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: space.md },
+  medal: { position: 'absolute', right: -4, top: -2, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
+  medalText: { color: '#1A1A1A', fontWeight: '800', fontSize: 12 },
+  podName: { marginTop: 8, fontSize: 14, fontWeight: '600', maxWidth: '95%' },
+  pill: { marginTop: 6, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
+  pillText: { color: '#14210F', fontWeight: '800', fontSize: 14 },
+  blockNum: { fontSize: 56, fontWeight: '700', color: 'rgba(244,243,236,0.35)', lineHeight: 60 },
+  mine: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  mineHint: { color: colors.cream, fontWeight: '600', fontSize: 13, textAlign: 'right', flexShrink: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  rowMine: { backgroundColor: 'rgba(244,243,236,0.04)', borderRadius: 12, paddingHorizontal: 8 },
+  rank: { flexDirection: 'row', alignItems: 'center', gap: 3, width: 36 },
+  rankText: { color: colors.muted, fontWeight: '600', fontSize: 14 },
+  name: { fontSize: 16, fontWeight: '600' },
+  pts: { fontSize: 17, fontWeight: '700' },
+  delta: { color: colors.lime, fontSize: 12, fontWeight: '600', marginTop: 2 },
+  cut: { color: colors.hot, textAlign: 'center', fontSize: 11, fontWeight: '600', paddingVertical: 8, letterSpacing: 1, textTransform: 'uppercase' },
 });
