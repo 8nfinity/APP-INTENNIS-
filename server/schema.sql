@@ -125,6 +125,26 @@ alter table point_events drop constraint if exists point_events_reason_check;
 alter table point_events add constraint point_events_reason_check
   check (reason in ('match_win','match_loss','booking_jogo','booking_aula','admin_adjust'));
 
+-- ---------- v4: professores ----------
+-- Cada professor tem o próprio preço por aula. `player_id` liga o professor a
+-- uma conta do app: é com ela que ele entra e vê a agenda.
+create table if not exists teachers (
+  id uuid primary key default gen_random_uuid(),
+  player_id uuid unique references players(id) on delete set null,
+  name text not null,
+  bio text not null default '',
+  price_per_hour numeric(10,2) not null check (price_per_hour >= 0),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+alter table teachers enable row level security;
+
+alter table bookings add column if not exists teacher_id uuid references teachers(id);
+alter table bookings add column if not exists teacher_price numeric(10,2); -- valor do professor na data da reserva
+-- o mesmo professor não pode ter duas aulas no mesmo horário
+create unique index if not exists bookings_teacher_slot
+  on bookings (teacher_id, date, hour) where teacher_id is not null and status in ('pendente','pago','concluido');
+
 -- Segurança: com RLS ligado e nenhuma policy, a chave pública do Supabase não
 -- lê nem escreve nestas tabelas. Só o servidor (conexão direta, DATABASE_URL)
 -- acessa, e ele valida o login e as permissões de cada pedido.

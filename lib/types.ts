@@ -5,6 +5,7 @@ export type Player = {
   bio: string;
   isAdmin: boolean;
   avatarUrl: string | null;
+  teacherId: string | null; // conta ligada a um professor: vê a agenda de aulas
   points: number;
   monthPoints: number;
   wins: number;
@@ -26,6 +27,22 @@ export type Booking = {
   price: number;
   method: 'pix' | 'cartao' | null;
   status: 'pendente' | 'pago' | 'concluido' | 'cancelado';
+  teacherName?: string | null;
+};
+
+export type Teacher = { id: string; name: string; bio: string; pricePerHour: number; avatarUrl: string | null };
+export type AdminTeacher = Omit<Teacher, 'avatarUrl'> & { active: boolean; playerUsername: string | null; playerName: string | null };
+
+export type TeacherClass = {
+  id: string;
+  date: string;
+  hour: number;
+  status: 'pago' | 'concluido';
+  courtName: string;
+  studentName: string;
+  studentUsername: string;
+  studentAvatarUrl: string | null;
+  teacherPrice: number;
 };
 
 export type MatchRow = {
@@ -78,6 +95,7 @@ export type AdminBooking = {
   status: Booking['status'];
   playerName: string;
   playerUsername: string;
+  teacherName: string | null;
 };
 
 export type CourtBlock = { id: string; courtId: string; courtName: string; date: string; hour: number; reason: string };

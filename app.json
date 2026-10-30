@@ -1,17 +1,24 @@
 {
   "expo": {
     "name": "In Tennis Club",
-    "slug": "tenis-app",
+    "slug": "in-tennis-club",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tenisapp",
+    "scheme": "intennis",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0A120D",
+    "backgroundColor": "#0A0D0B",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.intennisclub.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.intennisclub.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#253A2B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -36,7 +43,14 @@
           "backgroundColor": "#253A2B"
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O In Tennis Club usa suas fotos para a foto de perfil e para publicar seus jogos.",
+          "cameraPermission": "O In Tennis Club usa a câmera para tirar fotos dos seus jogos."
+        }
+      ]
     ]
   }
 }

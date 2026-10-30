@@ -131,7 +131,7 @@ export default function Perfil() {
                       {b.date === today ? 'Hoje' : fmtDate(b.date)} · {pad2(b.hour)}:00
                     </Text>
                     <Muted>
-                      {b.kind === 'aula' ? 'Aula' : 'Jogo'} · {courtName(b.courtId)}
+                      {b.kind === 'aula' ? `Aula${b.teacherName ? ` com ${b.teacherName}` : ''}` : 'Jogo'} · {courtName(b.courtId)}
                     </Muted>
                   </View>
                 </View>

@@ -15,6 +15,7 @@ export default function AdminLayout() {
       }}>
       <Stack.Screen name="index" options={{ title: 'Administração' }} />
       <Stack.Screen name="courts" options={{ title: 'Quadras' }} />
+      <Stack.Screen name="teachers" options={{ title: 'Professores' }} />
       <Stack.Screen name="blocks" options={{ title: 'Bloquear horários' }} />
       <Stack.Screen name="bookings" options={{ title: 'Reservas' }} />
       <Stack.Screen name="events" options={{ title: 'Eventos' }} />

@@ -1,7 +1,6 @@
 const express = require('express');
 
 const HOURS = [7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 21];
-const CLASS_EXTRA = 60;
 const POINTS = { match_win: 30, match_loss: 10, booking_jogo: 10, booking_aula: 20 };
 const DAILY_MATCH_POINT_CAP = 3; // partidas que pontuam por dia, evita "farmar" ponto
 const PENDING_MINUTES = 15;
@@ -42,6 +41,7 @@ function addDays(iso, n) {
 
 const PLAYER_SQL = `
   select p.id, p.name, p.username, p.bio, p.is_admin as "isAdmin", p.avatar_url as "avatarUrl",
+    (select t.id from teachers t where t.player_id = p.id and t.active) as "teacherId",
     coalesce((select sum(points) from point_events where player_id = p.id), 0)::int as points,
     coalesce((select sum(points) from point_events where player_id = p.id
       and created_at >= date_trunc('month', now() at time zone '${TZ}') at time zone '${TZ}'), 0)::int as "monthPoints",
@@ -165,7 +165,17 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     const { rows } = await pool.query(
       'select id, name, surface, price_per_hour::float as "pricePerHour" from courts where active order by id',
     );
-    res.json({ courts: rows, hours: HOURS, classExtra: CLASS_EXTRA, maxDaysAhead: MAX_DAYS_AHEAD });
+    res.json({ courts: rows, hours: HOURS, maxDaysAhead: MAX_DAYS_AHEAD });
+  }));
+
+  // Professores disponíveis para aula (cada um com o próprio preço).
+  r.get('/teachers', wrap(async (_req, res) => {
+    const { rows } = await pool.query(
+      `select t.id, t.name, t.bio, t.price_per_hour::float as "pricePerHour", p.avatar_url as "avatarUrl"
+       from teachers t left join players p on p.id = t.player_id
+       where t.active order by t.name`,
+    );
+    res.json({ teachers: rows });
   }));
 
   async function expirePending() {
@@ -187,7 +197,15 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
        select court_id, hour from court_blocks where date = $1`,
       [date],
     );
-    res.json({ taken: rows });
+    // com ?teacherId=, devolve também os horários em que o professor já tem aula
+    let teacherTaken = [];
+    if (typeof req.query.teacherId === 'string' && UUID.test(req.query.teacherId)) {
+      teacherTaken = (await pool.query(
+        `select hour from bookings where teacher_id = $1 and date = $2 and status in ('pendente','pago','concluido')`,
+        [req.query.teacherId, date],
+      )).rows.map((x) => x.hour);
+    }
+    res.json({ taken: rows, teacherTaken });
   }));
 
   // Ocupação por dia (para o calendário e o mapa dos próximos dias).
@@ -216,10 +234,11 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     const p = await needMe(req);
     await expirePending();
     const { rows } = await pool.query(
-      `select id, court_id as "courtId", to_char(date,'YYYY-MM-DD') as date, hour, kind,
-              price::float as price, payment_method as method, status
-       from bookings where player_id = $1 and status <> 'cancelado'
-       order by date desc, hour desc limit 100`,
+      `select b.id, b.court_id as "courtId", to_char(b.date,'YYYY-MM-DD') as date, b.hour, b.kind,
+              b.price::float as price, b.payment_method as method, b.status, t.name as "teacherName"
+       from bookings b left join teachers t on t.id = b.teacher_id
+       where b.player_id = $1 and b.status <> 'cancelado'
+       order by b.date desc, b.hour desc limit 100`,
       [p.id],
     );
     res.json({ bookings: rows });
@@ -241,18 +260,29 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     if (!court) throw bad('Quadra inválida');
     const blocked = await pool.query('select 1 from court_blocks where court_id = $1 and date = $2 and hour = $3', [courtId, date, hour]);
     if (blocked.rowCount) throw new HttpError(409, 'Esse horário está indisponível');
-    const price = court.price + (kind === 'aula' ? CLASS_EXTRA : 0); // o preço vem SEMPRE do servidor
+    // Aula: o aluno escolhe o professor e paga quadra + valor do professor.
+    let teacher = null;
+    if (kind === 'aula') {
+      const tid = req.body.teacherId;
+      if (typeof tid !== 'string' || !UUID.test(tid)) throw bad('Escolha o professor');
+      teacher = (await pool.query('select id, price_per_hour::float as price from teachers where id = $1 and active', [tid])).rows[0];
+      if (!teacher) throw bad('Professor indisponível');
+    }
+    const price = court.price + (teacher ? teacher.price : 0); // o preço vem SEMPRE do servidor
 
     await expirePending();
     try {
       const { rows } = await pool.query(
-        `insert into bookings (player_id, court_id, date, hour, kind, price)
-         values ($1,$2,$3,$4,$5,$6)
+        `insert into bookings (player_id, court_id, date, hour, kind, price, teacher_id, teacher_price)
+         values ($1,$2,$3,$4,$5,$6,$7,$8)
          returning id, court_id as "courtId", to_char(date,'YYYY-MM-DD') as date, hour, kind, price::float as price, status`,
-        [p.id, courtId, date, hour, kind, price],
+        [p.id, courtId, date, hour, kind, price, teacher?.id ?? null, teacher?.price ?? null],
       );
       res.status(201).json({ booking: rows[0], holdMinutes: PENDING_MINUTES });
     } catch (e) {
+      if (e.code === '23505' && e.constraint === 'bookings_teacher_slot') {
+        throw new HttpError(409, 'Esse professor já tem aula nesse horário. Escolha outro horário ou professor.');
+      }
       if (e.code === '23505') throw new HttpError(409, 'Esse horário acabou de ser reservado por outra pessoa');
       throw e;
     }
@@ -504,6 +534,34 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     res.status(201).json({ ok: true });
   }));
 
+  // ---------- agenda do professor (só para contas ligadas a um professor ativo) ----------
+  r.get('/teacher/agenda', wrap(async (req, res) => {
+    const p = await needMe(req);
+    const t = (await pool.query(
+      'select id, name, price_per_hour::float as "pricePerHour" from teachers where player_id = $1 and active',
+      [p.id],
+    )).rows[0];
+    if (!t) throw new HttpError(403, 'Sua conta não está ligada a um professor');
+    const from = DATE.test(String(req.query.from || '')) ? String(req.query.from) : nowSp().date;
+    const days = Math.min(366, Math.max(1, Number(req.query.days) || 62));
+    const { rows } = await pool.query(
+      `select b.id, to_char(b.date,'YYYY-MM-DD') as date, b.hour, b.status, c.name as "courtName",
+              s.name as "studentName", s.username as "studentUsername", s.avatar_url as "studentAvatarUrl",
+              coalesce(b.teacher_price, 0)::float as "teacherPrice"
+       from bookings b join courts c on c.id = b.court_id join players s on s.id = b.player_id
+       where b.teacher_id = $1 and b.status in ('pago','concluido') and b.date between $2 and $3
+       order by b.date, b.hour`,
+      [t.id, from, addDays(from, days - 1)],
+    );
+    const month = (await pool.query(
+      `select count(*)::int as n, coalesce(sum(teacher_price),0)::float as total from bookings
+       where teacher_id = $1 and status in ('pago','concluido')
+         and date_trunc('month', date) = date_trunc('month', (now() at time zone '${TZ}')::date)`,
+      [t.id],
+    )).rows[0];
+    res.json({ teacher: t, classes: rows, month });
+  }));
+
   // ---------- administração (tudo exige is_admin) ----------
   const adm = express.Router();
   adm.use((req, _res, next) => {
@@ -612,8 +670,10 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     const byDate = DATE.test(date);
     const { rows } = await pool.query(
       `select b.id, b.court_id as "courtId", c.name as "courtName", to_char(b.date,'YYYY-MM-DD') as date, b.hour,
-              b.kind, b.price::float as price, b.status, p.name as "playerName", p.username as "playerUsername"
+              b.kind, b.price::float as price, b.status, p.name as "playerName", p.username as "playerUsername",
+              t.name as "teacherName"
        from bookings b join courts c on c.id = b.court_id join players p on p.id = b.player_id
+       left join teachers t on t.id = b.teacher_id
        where b.status <> 'cancelado' and ${byDate ? 'b.date = $1' : `b.date >= (now() at time zone '${TZ}')::date and $1::text is not null`}
        order by b.date, b.hour limit 200`,
       [byDate ? date : 'x'],
@@ -665,6 +725,60 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
   adm.delete('/events/:id', wrap(async (req, res) => {
     if (!UUID.test(req.params.id)) throw bad('Evento inválido');
     await pool.query('delete from events where id = $1', [req.params.id]);
+    res.json({ ok: true });
+  }));
+
+  // Professores: preço por aula e conta de acesso (pelo @usuário do app).
+  async function playerByUsername(username) {
+    if (username === undefined) return undefined; // não mexer
+    const u = String(username).trim().replace(/^@/, '').toLowerCase();
+    if (!u) return null; // desligar a conta
+    const row = (await pool.query('select id from players where username = $1', [u])).rows[0];
+    if (!row) throw new HttpError(404, `Não existe jogador com o usuário @${u}`);
+    return row.id;
+  }
+  const teacherErr = (e) => {
+    if (e.code === '23505') throw new HttpError(409, 'Essa conta já está ligada a outro professor');
+    throw e;
+  };
+
+  adm.get('/teachers', wrap(async (_req, res) => {
+    const { rows } = await pool.query(
+      `select t.id, t.name, t.bio, t.price_per_hour::float as "pricePerHour", t.active,
+              p.username as "playerUsername", p.name as "playerName"
+       from teachers t left join players p on p.id = t.player_id order by t.active desc, t.name`,
+    );
+    res.json({ teachers: rows });
+  }));
+
+  adm.post('/teachers', wrap(async (req, res) => {
+    const name = str(req.body.name, { min: 2, max: 60, field: 'Nome' });
+    const bio = str(req.body.bio ?? '', { max: 160, field: 'Descrição' });
+    const price = Number(req.body.pricePerHour);
+    if (!(price >= 0 && price <= 5000)) throw bad('Valor da aula inválido');
+    const playerId = (await playerByUsername(req.body.playerUsername)) ?? null;
+    await pool
+      .query('insert into teachers (name, bio, price_per_hour, player_id) values ($1,$2,$3,$4)', [name, bio, price, playerId])
+      .catch(teacherErr);
+    res.status(201).json({ ok: true });
+  }));
+
+  adm.patch('/teachers/:id', wrap(async (req, res) => {
+    if (!UUID.test(req.params.id)) throw bad('Professor inválido');
+    const t = (await pool.query('select * from teachers where id = $1', [req.params.id])).rows[0];
+    if (!t) throw new HttpError(404, 'Professor não encontrado');
+    const name = req.body.name === undefined ? t.name : str(req.body.name, { min: 2, max: 60, field: 'Nome' });
+    const bio = req.body.bio === undefined ? t.bio : str(req.body.bio, { max: 160, field: 'Descrição' });
+    const price = req.body.pricePerHour === undefined ? Number(t.price_per_hour) : Number(req.body.pricePerHour);
+    if (!(price >= 0 && price <= 5000)) throw bad('Valor da aula inválido');
+    const active = req.body.active === undefined ? t.active : req.body.active === true;
+    const linked = await playerByUsername(req.body.playerUsername);
+    const playerId = linked === undefined ? t.player_id : linked;
+    await pool
+      .query('update teachers set name=$1, bio=$2, price_per_hour=$3, active=$4, player_id=$5 where id=$6', [
+        name, bio, price, active, playerId, t.id,
+      ])
+      .catch(teacherErr);
     res.json({ ok: true });
   }));
 

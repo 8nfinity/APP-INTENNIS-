@@ -66,7 +66,7 @@ export default function AdminBookings() {
               {b.playerName} <Muted>@{b.playerUsername}</Muted>
             </Text>
             <Muted>
-              {b.courtName} · {b.kind === 'aula' ? 'Aula' : 'Jogo'} · {formatBRL(b.price)} · {fmtDate(b.date)}
+              {b.courtName} · {b.kind === 'aula' ? `Aula${b.teacherName ? ` com ${b.teacherName}` : ''}` : 'Jogo'} · {formatBRL(b.price)} · {fmtDate(b.date)}
             </Muted>
             {(b.status === 'pago' || b.status === 'pendente') && (
               <Button label="Cancelar reserva" variant="danger" onPress={() => cancel(b)} />

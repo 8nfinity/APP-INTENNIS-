@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { CourtArt } from '@/components/CourtArt';
-import { Button, Card, Chip, ErrorState, Muted, Screen, Section, Stepper, Text, formatBRL } from '@/components/ui';
+import { Avatar, Button, Card, Chip, ErrorState, Muted, Screen, Section, Stepper, Text, formatBRL } from '@/components/ui';
 import { useFetch } from '@/lib/api';
 import { pad2 } from '@/lib/booking';
 import { toISO } from '@/lib/game';
 import { colors, radius, space } from '@/lib/theme';
-import { BookingKind, Court } from '@/lib/types';
+import { BookingKind, Court, Teacher } from '@/lib/types';
 
 const WEEK = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -37,26 +37,38 @@ export default function Agendar() {
   const [hour, setHour] = useState<number | null>(null);
   const [courtId, setCourtId] = useState<string | null>(null);
   const [kind, setKind] = useState<BookingKind>('jogo');
+  const [teacherId, setTeacherId] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [cursor, setCursor] = useState(() => ({ y: new Date().getFullYear(), m: new Date().getMonth() }));
 
-  const courtsQ = useFetch<{ courts: Court[]; hours: number[]; classExtra: number; maxDaysAhead: number }>('/courts');
+  const courtsQ = useFetch<{ courts: Court[]; hours: number[]; maxDaysAhead: number }>('/courts');
+  const teachersQ = useFetch<{ teachers: Teacher[] }>('/teachers');
+  const teachers = teachersQ.data?.teachers ?? [];
+  const teacher = kind === 'aula' ? (teachers.find((t) => t.id === teacherId) ?? teachers[0]) : undefined;
   const maxDate = addDays(today, courtsQ.data?.maxDaysAhead ?? 365);
   const monthStart = toISO(new Date(cursor.y, cursor.m, 1));
   const daysInMonth = new Date(cursor.y, cursor.m + 1, 0).getDate();
   const monthFrom = monthStart < today ? today : monthStart;
   const monthDays = Math.max(1, daysInMonth - parse(monthFrom).getDate() + 1);
   const monthQ = useFetch<Summary>(`/availability/summary?from=${monthFrom}&days=${monthDays}`);
-  const dayQ = useFetch<{ taken: { courtId: string; hour: number }[] }>(`/availability?date=${date}`);
+  const dayQ = useFetch<{ taken: { courtId: string; hour: number }[]; teacherTaken: number[] }>(
+    `/availability?date=${date}${teacher ? `&teacherId=${teacher.id}` : ''}`,
+  );
 
   const courts = courtsQ.data?.courts ?? [];
   const hours = courtsQ.data?.hours ?? [];
   const court = courts.find((c) => c.id === courtId) ?? courts[0];
-  const price = court ? court.pricePerHour + (kind === 'aula' ? (courtsQ.data?.classExtra ?? 0) : 0) : 0;
+  const price = court ? court.pricePerHour + (teacher ? teacher.pricePerHour : 0) : 0;
   const now = new Date();
+  const noTeacher = kind === 'aula' && !teacher;
 
+  // indisponível: horário passado, quadra ocupada ou (aula) professor já ocupado
   const unavailable = (c: Court | undefined, h: number) =>
-    !c || (date === today && h <= now.getHours()) || !!dayQ.data?.taken.some((t) => t.courtId === c.id && t.hour === h);
+    !c ||
+    noTeacher ||
+    (date === today && h <= now.getHours()) ||
+    !!dayQ.data?.taken.some((t) => t.courtId === c.id && t.hour === h) ||
+    (!!teacher && !!dayQ.data?.teacherTaken.includes(h));
 
   const pickDate = (iso: string) => {
     setDate(iso);
@@ -88,7 +100,7 @@ export default function Agendar() {
 
   const goPay = () => {
     if (!court || hour === null) return;
-    router.push({ pathname: '/checkout', params: { courtId: court.id, date, hour: String(hour), kind } });
+    router.push({ pathname: '/checkout', params: { courtId: court.id, date, hour: String(hour), kind, teacherId: teacher?.id ?? '' } });
   };
 
   const reload = () => {
@@ -113,7 +125,11 @@ export default function Agendar() {
               {court.name} · {court.surface}
             </Text>
             <Muted style={{ lineHeight: 18 }}>
-              {kind === 'aula' ? 'Aula com professor, raquete e bolas inclusas.' : 'Quadra livre para jogar com quem você quiser.'}
+              {kind === 'aula'
+                ? teacher
+                  ? `Aula com ${teacher.name} (${formatBRL(teacher.pricePerHour)}) + quadra.`
+                  : 'Nenhum professor disponível no momento.'
+                : 'Quadra livre para jogar com quem você quiser.'}
             </Muted>
             <View style={s.serviceMeta}>
               <Ionicons name="time-outline" size={15} color={colors.muted} />
@@ -139,8 +155,44 @@ export default function Agendar() {
       </ScrollView>
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <Chip label="Jogo livre" icon="tennisball-outline" active={kind === 'jogo'} onPress={() => setKind('jogo')} />
-        <Chip label="Aula com professor" icon="school-outline" active={kind === 'aula'} onPress={() => setKind('aula')} />
+        <Chip
+          label="Aula com professor"
+          icon="school-outline"
+          active={kind === 'aula'}
+          onPress={() => {
+            setKind('aula');
+            setHour(null);
+          }}
+        />
       </View>
+
+      {/* escolha do professor: cada um com o próprio valor */}
+      {kind === 'aula' && (
+        <View style={{ gap: space.sm }}>
+          <Section>Professor</Section>
+          {teachers.length === 0 && <Muted>Nenhum professor cadastrado ainda. Fale com o clube.</Muted>}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+            {teachers.map((t) => {
+              const on = t.id === teacher?.id;
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={() => {
+                    setTeacherId(t.id);
+                    setHour(null);
+                  }}
+                  style={[s.teacher, on && s.teacherOn]}>
+                  <Avatar name={t.name} url={t.avatarUrl} size={48} />
+                  <Text style={[s.teacherName, on && { color: colors.onAccent }]} numberOfLines={1}>
+                    {t.name}
+                  </Text>
+                  <Text style={[s.teacherPrice, on && { color: colors.onAccent }]}>{formatBRL(t.pricePerHour)}/aula</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       <Section>Selecione a data</Section>
       <Card style={{ gap: space.md }}>
@@ -274,6 +326,10 @@ export default function Agendar() {
 
 const s = StyleSheet.create({
   title: { textAlign: 'center', fontSize: 18, fontWeight: '700', marginTop: 4 },
+  teacher: { width: 120, alignItems: 'center', gap: 6, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  teacherOn: { backgroundColor: colors.cream, borderColor: colors.cream },
+  teacherName: { fontSize: 14, fontWeight: '700', maxWidth: '100%' },
+  teacherPrice: { fontSize: 12, color: colors.muted, fontWeight: '600' },
   service: { flexDirection: 'row', gap: space.lg, alignItems: 'center', padding: space.md },
   serviceName: { fontSize: 17, fontWeight: '700' },
   serviceMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },

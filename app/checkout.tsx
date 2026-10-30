@@ -10,7 +10,7 @@ import { pad2 } from '@/lib/booking';
 import { notify } from '@/lib/dialog';
 import { fmtDate } from '@/lib/game';
 import { colors, radius, space } from '@/lib/theme';
-import { BookingKind, Court } from '@/lib/types';
+import { BookingKind, Court, Teacher } from '@/lib/types';
 
 const METHODS = [
   { key: 'pix' as const, label: 'Pix', sub: 'Aprovação na hora', icon: 'qr-code-outline' as const },
@@ -18,12 +18,14 @@ const METHODS = [
 ];
 
 export default function Checkout() {
-  const p = useLocalSearchParams<{ courtId: string; date: string; hour: string; kind: string }>();
+  const p = useLocalSearchParams<{ courtId: string; date: string; hour: string; kind: string; teacherId?: string }>();
   const hour = Number(p.hour);
   const kind = p.kind as BookingKind;
-  const { data } = useFetch<{ courts: Court[]; classExtra: number }>('/courts');
+  const { data } = useFetch<{ courts: Court[] }>('/courts');
+  const teachersQ = useFetch<{ teachers: Teacher[] }>('/teachers');
   const court = data?.courts.find((c) => c.id === p.courtId);
-  const price = court ? court.pricePerHour + (kind === 'aula' ? data!.classExtra : 0) : 0;
+  const teacher = kind === 'aula' ? teachersQ.data?.teachers.find((t) => t.id === p.teacherId) : undefined;
+  const price = court ? court.pricePerHour + (teacher?.pricePerHour ?? 0) : 0;
 
   const [method, setMethod] = useState<'pix' | 'cartao'>('pix');
   const [busy, setBusy] = useState(false);
@@ -43,7 +45,7 @@ export default function Checkout() {
     try {
       const { booking, holdMinutes } = await api<{ booking: { id: string }; holdMinutes: number }>('/bookings', {
         method: 'POST',
-        body: { courtId: p.courtId, date: p.date, hour, kind },
+        body: { courtId: p.courtId, date: p.date, hour, kind, teacherId: teacher?.id },
       });
       setSecs(holdMinutes * 60);
       await api(`/bookings/${booking.id}/pay`, { method: 'POST', body: { method } });
@@ -60,7 +62,7 @@ export default function Checkout() {
     <Screen>
       <Header title="Confirmar reserva" />
       <Stepper steps={['Quadra', 'Data e horário', 'Confirmar']} current={2} />
-      {!court ? (
+      {!court || (kind === 'aula' && teachersQ.loading) ? (
         <Loading />
       ) : (
         <>
@@ -70,7 +72,7 @@ export default function Checkout() {
               <Text style={{ fontSize: 17, fontWeight: '700' }}>
                 {court.name} · {court.surface}
               </Text>
-              <Muted>{kind === 'aula' ? 'Aula com professor' : 'Jogo livre'}</Muted>
+              <Muted>{kind === 'aula' ? `Aula com ${teacher?.name ?? 'professor'}` : 'Jogo livre'}</Muted>
               <Muted>
                 {fmtDate(p.date)} • {pad2(hour)}:00 às {pad2(hour + 1)}:00
               </Muted>
@@ -99,10 +101,10 @@ export default function Checkout() {
               <Muted>Quadra (60 min)</Muted>
               <Text>{formatBRL(court.pricePerHour)}</Text>
             </View>
-            {kind === 'aula' && (
+            {teacher && (
               <View style={s.line}>
-                <Muted>Professor</Muted>
-                <Text>{formatBRL(price - court.pricePerHour)}</Text>
+                <Muted>Professor: {teacher.name}</Muted>
+                <Text>{formatBRL(teacher.pricePerHour)}</Text>
               </View>
             )}
             <View style={[s.line, { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.sm }]}>

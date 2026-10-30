@@ -17,6 +17,7 @@ type Stats = {
 
 const MENU: { icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; href: Href }[] = [
   { icon: 'tennisball', title: 'Quadras', sub: 'Preço, piso, ativar e desativar', href: '/admin/courts' },
+  { icon: 'school', title: 'Professores', sub: 'Valor de cada aula e acesso à agenda', href: '/admin/teachers' },
   { icon: 'ban', title: 'Bloquear horários', sub: 'Manutenção, aulas e eventos', href: '/admin/blocks' },
   { icon: 'list', title: 'Reservas', sub: 'Ver e cancelar reservas', href: '/admin/bookings' },
   { icon: 'megaphone', title: 'Eventos', sub: 'Publicar e apagar eventos', href: '/admin/events' },
