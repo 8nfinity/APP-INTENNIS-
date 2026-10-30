@@ -15,6 +15,7 @@ import 'react-native-reanimated';
 
 import { Button, ErrorState } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import '@/lib/install'; // escuta cedo o aviso de instalação do navegador (webapp)
 import { colors } from '@/lib/theme';
 
 export {

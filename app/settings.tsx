@@ -6,12 +6,14 @@ import { Avatar, Header, ListGroup, ListRow, Muted, Screen, Text } from '@/compo
 import { useAuth, useMe } from '@/lib/auth';
 import { notify } from '@/lib/dialog';
 import { POINTS, TOURNAMENT_SPOTS } from '@/lib/game';
+import { installApp, useInstall } from '@/lib/install';
 import { colors, space } from '@/lib/theme';
 
 // Configurações (referência "Settings").
 export default function Settings() {
   const me = useMe();
   const { signOut, session } = useAuth();
+  const install = useInstall();
 
   const rules = () =>
     notify(
@@ -40,6 +42,12 @@ export default function Settings() {
         <ListRow icon="trophy-outline" label="Regras de pontuação" onPress={rules} last={!me.isAdmin} />
         {me.isAdmin && <ListRow icon="shield-checkmark-outline" label="Painel administrativo" onPress={() => router.push('/admin')} last />}
       </ListGroup>
+
+      {install.show && (
+        <ListGroup>
+          <ListRow icon="download-outline" label="Instalar o app no celular" onPress={installApp} last />
+        </ListGroup>
+      )}
 
       <ListGroup>
         <ListRow icon="logo-instagram" label="Instagram do clube" onPress={() => Linking.openURL('https://www.instagram.com/in.tennisclub/')} />

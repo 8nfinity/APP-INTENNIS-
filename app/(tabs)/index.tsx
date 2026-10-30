@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { CourtArt } from '@/components/CourtArt';
+import { InstallBanner } from '@/components/InstallBanner';
 import { Avatar, Button, Card, Chip, ErrorState, Muted, Screen, Section, Stepper, Text, formatBRL } from '@/components/ui';
 import { useFetch } from '@/lib/api';
 import { pad2 } from '@/lib/booking';
@@ -111,6 +112,7 @@ export default function Agendar() {
 
   return (
     <Screen tab refreshing={false} onRefresh={reload}>
+      <InstallBanner />
       <Text style={s.title}>Reservar quadra</Text>
       <Stepper steps={['Quadra', 'Data e horário', 'Confirmar']} current={hour === null ? 1 : 2} />
 

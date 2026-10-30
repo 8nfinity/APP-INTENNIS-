@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { ColorValue, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/lib/auth';
 import { FONT, colors } from '@/lib/theme';
@@ -16,6 +17,7 @@ const tab = (title: string, icon: IconName, iconOff: IconName) => ({
 
 export default function TabLayout() {
   const { player } = useAuth();
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
@@ -28,8 +30,9 @@ export default function TabLayout() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          // no navegador não há área segura: altura fixa para o nome da aba não cortar
-          ...(Platform.OS === 'web' ? { height: 66, paddingTop: 6, paddingBottom: 10 } : null),
+          // no navegador: altura fixa para o nome da aba não cortar, mais a faixa
+          // inferior do iPhone quando o webapp abre em tela cheia
+          ...(Platform.OS === 'web' ? { height: 66 + insets.bottom, paddingTop: 6, paddingBottom: 10 + insets.bottom } : null),
         },
       }}>
       <Tabs.Screen name="index" options={tab('Agendar', 'calendar', 'calendar-outline')} />
