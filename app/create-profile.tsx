@@ -34,7 +34,7 @@ export default function CreateProfile() {
 
   return (
     <Screen>
-      <Logo size={36} />
+      <Logo size={30} />
       <View style={{ gap: space.xs }}>
         <H1>Monte seu perfil</H1>
         <Muted>É assim que a galera vai te ver no ranking e no feed.</Muted>

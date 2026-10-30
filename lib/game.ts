@@ -10,7 +10,7 @@ export const LEVELS = [
   { name: 'Prata', min: 300, color: '#C5CDD3' },
   { name: 'Ouro', min: 600, color: '#FFD04A' },
   { name: 'Platina', min: 1000, color: '#5BC0EB' },
-  { name: 'Lenda', min: 1500, color: '#E4FF1A' },
+  { name: 'Lenda', min: 1500, color: '#D4F23C' },
 ];
 
 export function levelFor(points: number) {
@@ -34,7 +34,7 @@ export function fmtDate(iso: string) {
   return iso.split('-').reverse().join('/');
 }
 
-const AVATAR_COLORS = ['#E4FF1A', '#FF5A1F', '#5BC0EB', '#B388FF', '#FF7BAC', '#3DDC84', '#FFD04A', '#4DD0E1'];
+const AVATAR_COLORS = ['#D4F23C', '#E8A07A', '#8FC7B0', '#C9B8E8', '#F0B8C8', '#7BD39A', '#E8CF7A', '#8FD0DC'];
 export function avatarColor(seed: string) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 997;

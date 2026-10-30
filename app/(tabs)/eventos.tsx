@@ -94,7 +94,7 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: 'rgba(244,243,236,0.07)',
   },
   btnOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   btnText: { color: colors.text, fontWeight: '700' },

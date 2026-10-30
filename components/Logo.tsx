@@ -1,23 +1,10 @@
-import { StyleSheet, View } from 'react-native';
+import { Image } from 'react-native';
 
-import { Text } from '@/components/ui';
-import { colors } from '@/lib/theme';
+// Logo oficial do In Tennis Club (creme, fundo transparente) para usar sobre o verde da marca.
+const LOGO = require('../assets/images/logo.png');
+const RATIO = 491 / 372; // largura / altura do arquivo
 
-// Logo provisório em texto ("IN." + "TENNIS CLUB"). Para usar o logo oficial,
-// troque o conteúdo deste componente por um <Image source={require(...)} />:
-// o app inteiro passa a usar o novo logo.
-export function Logo({ size = 40, tagline = true }: { size?: number; tagline?: boolean }) {
-  return (
-    <View>
-      <Text style={[s.mark, { fontSize: size, lineHeight: size * 1.05 }]}>
-        IN<Text style={{ color: colors.accent }}>.</Text>
-      </Text>
-      {tagline && <Text style={[s.sub, { fontSize: Math.max(9, size * 0.24) }]}>TENNIS CLUB</Text>}
-    </View>
-  );
+export function Logo({ size = 40 }: { size?: number }) {
+  // `size` é a altura do logo
+  return <Image source={LOGO} style={{ height: size * 1.9, width: size * 1.9 * RATIO }} resizeMode="contain" />;
 }
-
-const s = StyleSheet.create({
-  mark: { color: colors.text, fontWeight: '900', letterSpacing: -2 },
-  sub: { color: colors.muted, fontWeight: '800', letterSpacing: 3, marginTop: -2 },
-});

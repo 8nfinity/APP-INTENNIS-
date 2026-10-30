@@ -50,8 +50,8 @@ export function Screen({
   const insets = useSafeAreaInsets();
   return (
     <View style={s.screen}>
-      <LinearGradient pointerEvents="none" colors={['rgba(228,255,26,0.20)', 'rgba(228,255,26,0)']} style={s.glowTop} />
-      <LinearGradient pointerEvents="none" colors={['rgba(228,255,26,0)', 'rgba(228,255,26,0.09)']} style={s.glowBottom} />
+      <LinearGradient pointerEvents="none" colors={['rgba(70,120,88,0.42)', 'rgba(70,120,88,0)']} style={s.glowTop} />
+      <LinearGradient pointerEvents="none" colors={['rgba(70,120,88,0)', 'rgba(70,120,88,0.16)']} style={s.glowBottom} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -85,10 +85,10 @@ export function Card({
   if (hero) return <View style={[s.card, s.hero, style]}>{children}</View>;
   return (
     <LinearGradient
-      colors={glow ? ['rgba(228,255,26,0.30)', 'rgba(228,255,26,0.05)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.025)']}
+      colors={glow ? ['rgba(84,140,104,0.36)', 'rgba(84,140,104,0.08)', 'rgba(244,243,236,0.02)'] : ['rgba(244,243,236,0.08)', 'rgba(244,243,236,0.025)']}
       start={{ x: 0, y: 0 }}
       end={{ x: 0.8, y: 1 }}
-      style={[s.card, glow && { borderColor: 'rgba(228,255,26,0.38)' }, style]}>
+      style={[s.card, glow && { borderColor: 'rgba(212,242,60,0.32)' }, style]}>
       {children}
     </LinearGradient>
   );
@@ -209,7 +209,7 @@ export function Avatar({ name, url, size = 44 }: { name: string; url?: string | 
     .toUpperCase();
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: avatarColor(name), alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#0A0A00', fontWeight: '900', fontSize: size * 0.38 }}>{initials}</Text>
+      <Text style={{ color: colors.onAccent, fontWeight: '900', fontSize: size * 0.38 }}>{initials}</Text>
     </View>
   );
 }
@@ -238,14 +238,14 @@ export function Gauge({ value, size = 230, children }: { value: number; size?: n
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         {ticks.map((t, i) => (
-          <Line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke="#0A0A00" strokeWidth={t.w} opacity={0.7} />
+          <Line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke={colors.cream} strokeWidth={t.w} opacity={0.45} />
         ))}
-        <Circle cx={c} cy={c} r={r} stroke="#0A0A00" strokeOpacity={0.14} strokeWidth={9} fill="none" />
+        <Circle cx={c} cy={c} r={r} stroke={colors.cream} strokeOpacity={0.14} strokeWidth={9} fill="none" />
         <Circle
           cx={c}
           cy={c}
           r={r}
-          stroke="#0A0A00"
+          stroke={colors.accent}
           strokeWidth={9}
           strokeLinecap="round"
           fill="none"
@@ -313,7 +313,7 @@ const s = StyleSheet.create({
     borderColor: colors.border,
     overflow: 'hidden',
   },
-  hero: { backgroundColor: colors.accent, borderColor: colors.accent, borderRadius: radius.xl, padding: space.xl },
+  hero: { backgroundColor: colors.brand, borderColor: 'rgba(244,243,236,0.16)', borderRadius: radius.xl, padding: space.xl },
   muted: { color: colors.muted, fontSize: 13 },
   error: { color: colors.danger, fontSize: 13 },
   btn: {
@@ -327,8 +327,8 @@ const s = StyleSheet.create({
     gap: 8,
   },
   btnPrimary: { backgroundColor: colors.accent },
-  btnGhost: { backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: colors.border },
-  btnDark: { backgroundColor: '#0A0A00' },
+  btnGhost: { backgroundColor: 'rgba(244,243,236,0.07)', borderWidth: 1, borderColor: colors.border },
+  btnDark: { backgroundColor: colors.bg },
   btnDanger: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger },
   btnText: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
   btnCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
@@ -336,7 +336,7 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: 'rgba(244,243,236,0.07)',
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -344,7 +344,7 @@ const s = StyleSheet.create({
   chipText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   label: { color: colors.muted, fontWeight: '700', fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase' },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(244,243,236,0.06)',
     color: colors.text,
     borderRadius: radius.md,
     paddingHorizontal: space.lg,
@@ -354,7 +354,7 @@ const s = StyleSheet.create({
     fontSize: 16,
     fontFamily: FONT.medium,
   },
-  track: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
+  track: { height: 8, borderRadius: 4, backgroundColor: 'rgba(244,243,236,0.12)', overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 4 },
   tile: { flex: 1, minWidth: '45%', alignItems: 'center', paddingVertical: 26, gap: 4 },
   tileValue: { fontSize: 38, fontWeight: '900', letterSpacing: -1.5, color: colors.text },

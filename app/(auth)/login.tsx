@@ -33,7 +33,7 @@ export default function Login() {
       <Pressable onPress={() => router.back()} hitSlop={12}>
         <Ionicons name="arrow-back" size={24} color={colors.text} />
       </Pressable>
-      <Logo size={36} />
+      <Logo size={30} />
       <View style={{ gap: space.xs }}>
         <H1>Bem-vindo de volta</H1>
         <Muted>Entre para reservar sua quadra e ver o ranking.</Muted>

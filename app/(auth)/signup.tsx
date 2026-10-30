@@ -41,7 +41,7 @@ export default function Signup() {
   if (sent) {
     return (
       <Screen>
-        <Logo size={36} />
+        <Logo size={30} />
         <Card glow style={{ gap: space.md }}>
           <Ionicons name="mail" size={32} color={colors.accent} />
           <H1>Confirme seu e-mail</H1>
@@ -59,7 +59,7 @@ export default function Signup() {
       <Pressable onPress={() => router.back()} hitSlop={12}>
         <Ionicons name="arrow-back" size={24} color={colors.text} />
       </Pressable>
-      <Logo size={36} />
+      <Logo size={30} />
       <View style={{ gap: space.xs }}>
         <H1>Crie sua conta</H1>
         <Muted>Leva menos de um minuto.</Muted>

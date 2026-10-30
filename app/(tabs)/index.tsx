@@ -44,7 +44,7 @@ export default function Inicio() {
   return (
     <Screen tab refreshing={false} onRefresh={reload}>
       <View style={s.top}>
-        <Logo size={32} />
+        <Logo size={24} />
         <View style={s.topRight}>
           {me.isAdmin && (
             <Pressable onPress={() => router.push('/admin')} style={s.adminBtn} hitSlop={8}>
@@ -128,20 +128,20 @@ const s = StyleSheet.create({
     borderRadius: 999,
   },
   adminText: { color: colors.onAccent, fontWeight: '800', fontSize: 12 },
-  heroTitle: { color: colors.onAccent, fontSize: 40, fontWeight: '900', letterSpacing: -2, lineHeight: 40 },
-  gaugeNum: { color: colors.onAccent, fontSize: 62, fontWeight: '900', letterSpacing: -3, lineHeight: 64 },
-  gaugeUnit: { color: colors.onAccent, fontSize: 18, fontWeight: '800', opacity: 0.7, marginTop: -4 },
+  heroTitle: { color: colors.cream, fontSize: 40, fontWeight: '900', letterSpacing: -2, lineHeight: 40 },
+  gaugeNum: { color: colors.cream, fontSize: 62, fontWeight: '900', letterSpacing: -3, lineHeight: 64 },
+  gaugeUnit: { color: colors.cream, fontSize: 18, fontWeight: '800', opacity: 0.7, marginTop: -4 },
   levelPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#0A0A00',
+    backgroundColor: colors.bg,
     borderRadius: 999,
     paddingVertical: 14,
     paddingHorizontal: 18,
   },
   levelText: { color: colors.text, fontSize: 14, flex: 1 },
-  slide: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(10,10,0,0.9)', borderRadius: 999, padding: 6, gap: 12 },
+  slide: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg, borderRadius: 999, padding: 6, gap: 12 },
   slideDot: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   slideText: { color: colors.text, fontWeight: '800', fontSize: 15 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },

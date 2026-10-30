@@ -197,7 +197,7 @@ const s = StyleSheet.create({
   bar: {
     width: '100%',
     borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(244,243,236,0.08)',
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
