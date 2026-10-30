@@ -3,9 +3,11 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { View } from 'react-native';
 import 'react-native-reanimated';
 
-import { StoreProvider } from '@/lib/store';
+import { Button, ErrorState } from '@/components/ui';
+import { AuthProvider, useAuth } from '@/lib/auth';
 import { colors } from '@/lib/theme';
 
 export {
@@ -26,11 +28,19 @@ const theme = {
     ...DarkTheme.colors,
     background: colors.bg,
     card: colors.bg,
-    primary: colors.ball,
+    primary: colors.accent,
     text: colors.text,
     border: colors.border,
   },
 };
+
+const modal = (title: string) => ({
+  presentation: 'modal' as const,
+  title,
+  headerStyle: { backgroundColor: colors.surface },
+  headerTintColor: colors.text,
+  headerShadowVisible: false,
+});
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -41,28 +51,54 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
+  if (!loaded) return null;
 
   return (
-    <StoreProvider>
+    <AuthProvider>
       <ThemeProvider value={theme}>
         <StatusBar style="light" />
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="checkout" options={{ presentation: 'modal', title: 'Pagamento' }} />
-          <Stack.Screen name="new-post" options={{ presentation: 'modal', title: 'Nova publicação' }} />
-          <Stack.Screen name="edit-profile" options={{ presentation: 'modal', title: 'Editar perfil' }} />
-          <Stack.Screen name="match-result" options={{ presentation: 'modal', title: 'Registrar resultado' }} />
-        </Stack>
+        <RootNav />
       </ThemeProvider>
-    </StoreProvider>
+    </AuthProvider>
+  );
+}
+
+function RootNav() {
+  const { session, player, loading, profileError, refreshPlayer, signOut } = useAuth();
+
+  useEffect(() => {
+    if (!loading) SplashScreen.hideAsync();
+  }, [loading]);
+
+  if (loading) return null;
+
+  if (session && !player && profileError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', padding: 24, gap: 12 }}>
+        <ErrorState message={profileError} onRetry={refreshPlayer} />
+        <Button label="Sair da conta" variant="ghost" onPress={signOut} />
+      </View>
+    );
+  }
+
+  const authed = !!session && !!player;
+
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      <Stack.Protected guard={!session}>
+        <Stack.Screen name="(auth)" />
+      </Stack.Protected>
+      <Stack.Protected guard={!!session && !player}>
+        <Stack.Screen name="create-profile" />
+      </Stack.Protected>
+      <Stack.Protected guard={authed}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="checkout" options={{ headerShown: true, ...modal('Pagamento') }} />
+        <Stack.Screen name="new-post" options={{ headerShown: true, ...modal('Nova publicação') }} />
+        <Stack.Screen name="edit-profile" options={{ headerShown: true, ...modal('Editar perfil') }} />
+        <Stack.Screen name="match-result" options={{ headerShown: true, ...modal('Registrar resultado') }} />
+        <Stack.Screen name="comments" options={{ headerShown: true, ...modal('Comentários') }} />
+      </Stack.Protected>
+    </Stack>
   );
 }

@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "tenis-app",
+    "name": "In Tennis Club",
     "slug": "tenis-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "tenisapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#050505",
     "ios": {
       "supportsTablet": true
     },
@@ -31,12 +32,10 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#050505"
         }
-      ]
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
+      ],
+      "expo-video"
+    ]
   }
 }

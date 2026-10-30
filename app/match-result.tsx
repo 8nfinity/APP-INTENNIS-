@@ -1,62 +1,47 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
-import { Avatar, Button, Card, Chip, Muted, Title } from '@/components/ui';
-import { POINTS } from '@/lib/data';
-import { useStore } from '@/lib/store';
+import { Button, Card, Chip, ErrorText, Field, Muted, Screen, Title } from '@/components/ui';
+import { api, errMsg } from '@/lib/api';
 import { colors, space } from '@/lib/theme';
 
-export default function MatchResultScreen() {
-  const { matchId } = useLocalSearchParams<{ matchId: string }>();
-  const { matches, players, finishMatch } = useStore();
-  const match = matches.find((m) => m.id === matchId);
+export default function MatchResult() {
+  const { matchId, name } = useLocalSearchParams<{ matchId: string; name: string }>();
   const [result, setResult] = useState<'vitoria' | 'derrota'>('vitoria');
   const [score, setScore] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!match) return null;
-  const opp = players.find((p) => p.id === match.opponentId)!;
-
-  const save = () => {
-    finishMatch(match.id, result, score.trim());
-    const pts = result === 'vitoria' ? POINTS.vitoria : POINTS.derrota;
-    Alert.alert(result === 'vitoria' ? 'Vitória! 🎉' : 'Bom jogo!', `+${pts} pontos no ranking.`);
-    router.back();
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/matches/${matchId}/report`, { method: 'POST', body: { result, score: score.trim() } });
+      Alert.alert('Resultado enviado', `${name} precisa confirmar para os pontos serem somados.`);
+      router.back();
+    } catch (e) {
+      setError(errMsg(e));
+      setBusy(false);
+    }
   };
 
   return (
-    <View style={s.screen}>
-      <Card style={s.opp}>
-        <Avatar player={opp} size={48} />
-        <Title>vs {opp.name}</Title>
+    <Screen padTop={false}>
+      <Card>
+        <Muted>Seu jogo contra</Muted>
+        <Title style={{ fontSize: 24 }}>{name}</Title>
       </Card>
-      <View style={s.row}>
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
         <Chip label="Venci" active={result === 'vitoria'} onPress={() => setResult('vitoria')} />
         <Chip label="Perdi" active={result === 'derrota'} onPress={() => setResult('derrota')} />
       </View>
-      <TextInput
-        value={score}
-        onChangeText={setScore}
-        placeholder="Placar, ex: 6-4 3-6 7-5"
-        placeholderTextColor={colors.muted}
-        style={s.input}
-      />
-      <Muted>Nesta versão o resultado vale na hora. Em produção, o adversário confirma antes de os pontos serem somados.</Muted>
-      <Button label="Salvar resultado" onPress={save} />
-    </View>
+      <Field label="Placar" value={score} onChangeText={setScore} placeholder="ex: 6-4 3-6 7-5" maxLength={40} />
+      <Muted style={{ color: colors.muted }}>
+        Os pontos só entram depois que o adversário confirmar o resultado. Isso evita placares inventados.
+      </Muted>
+      <ErrorText>{error}</ErrorText>
+      <Button label="Enviar resultado" loading={busy} onPress={save} />
+    </Screen>
   );
 }
-
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, padding: space.lg, gap: space.lg },
-  opp: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  row: { flexDirection: 'row', gap: space.sm },
-  input: {
-    backgroundColor: colors.card,
-    color: colors.text,
-    borderRadius: 12,
-    padding: space.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-});

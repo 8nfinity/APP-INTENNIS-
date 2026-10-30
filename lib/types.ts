@@ -3,21 +3,16 @@ export type Player = {
   name: string;
   username: string;
   bio: string;
+  isAdmin: boolean;
   points: number;
   monthPoints: number;
   wins: number;
   losses: number;
   classes: number;
   streak: number;
-  color: string;
 };
 
-export type Court = {
-  id: string;
-  name: string;
-  surface: string;
-  pricePerHour: number;
-};
+export type Court = { id: string; name: string; surface: string; pricePerHour: number };
 
 export type BookingKind = 'jogo' | 'aula';
 
@@ -28,29 +23,42 @@ export type Booking = {
   hour: number;
   kind: BookingKind;
   price: number;
-  method: 'pix' | 'cartao';
-  status: 'pago' | 'concluido';
+  method: 'pix' | 'cartao' | null;
+  status: 'pendente' | 'pago' | 'concluido' | 'cancelado';
 };
 
-export type Match = {
+export type MatchRow = {
   id: string;
-  opponentId: string;
-  status: 'agendado' | 'finalizado';
-  result?: 'vitoria' | 'derrota';
-  score?: string;
+  status: 'agendado' | 'aguardando_confirmacao' | 'finalizado' | 'recusado';
+  score: string | null;
+  reportedBy: string | null;
+  winnerId: string | null;
+  otherId: string;
+  otherName: string;
+  otherUsername: string;
 };
 
 export type Post = {
   id: string;
-  authorId: string;
   text: string;
-  imageUri?: string;
+  mediaUrl: string | null;
   tag: 'jogo' | 'treino' | 'foto' | 'video';
-  score?: string;
+  score: string | null;
+  createdAt: string;
+  authorId: string;
+  authorName: string;
+  authorUsername: string;
   kudos: number;
-  comments: number;
   kudosByMe: boolean;
-  when: string;
+  comments: number;
+};
+
+export type Comment = {
+  id: string;
+  text: string;
+  createdAt: string;
+  authorName: string;
+  authorUsername: string;
 };
 
 export type GameEvent = {

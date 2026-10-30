@@ -6,10 +6,10 @@ import { colors } from '@/lib/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const tab = (title: string, icon: IconName) => ({
+const tab = (title: string, icon: IconName, iconOff: IconName) => ({
   title,
-  tabBarIcon: ({ color, size }: { color: ColorValue; size: number }) => (
-    <Ionicons name={icon} color={color as string} size={size} />
+  tabBarIcon: ({ color, size, focused }: { color: ColorValue; size: number; focused: boolean }) => (
+    <Ionicons name={focused ? icon : iconOff} color={color as string} size={size} />
   ),
 });
 
@@ -17,18 +17,17 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.ball,
+        headerShown: false,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
-        headerStyle: { backgroundColor: colors.bg },
-        headerTintColor: colors.text,
-        headerShadowVisible: false,
+        tabBarLabelStyle: { fontWeight: '700', fontSize: 11 },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
       }}>
-      <Tabs.Screen name="index" options={tab('Agendar', 'tennisball')} />
-      <Tabs.Screen name="ranking" options={tab('Ranking', 'trophy')} />
-      <Tabs.Screen name="eventos" options={tab('Eventos', 'calendar')} />
-      <Tabs.Screen name="social" options={tab('Social', 'people')} />
-      <Tabs.Screen name="perfil" options={tab('Perfil', 'person')} />
+      <Tabs.Screen name="index" options={tab('Início', 'tennisball', 'tennisball-outline')} />
+      <Tabs.Screen name="ranking" options={tab('Ranking', 'trophy', 'trophy-outline')} />
+      <Tabs.Screen name="eventos" options={tab('Eventos', 'calendar', 'calendar-outline')} />
+      <Tabs.Screen name="social" options={tab('Social', 'people', 'people-outline')} />
+      <Tabs.Screen name="perfil" options={tab('Perfil', 'person', 'person-outline')} />
     </Tabs>
   );
 }

@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "main": "index.js",
-  "scripts": { "start": "node index.js" },
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.2",
+    "helmet": "^8.3.0",
     "pg": "^8.13.1"
   }
 }
