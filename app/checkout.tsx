@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Button, Card, Chip, ErrorText, Loading, Muted, Screen, Text, Title, formatBRL } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
+import { notify } from '@/lib/dialog';
 import { fmtDate } from '@/lib/game';
 import { colors, space } from '@/lib/theme';
 import { BookingKind, Court } from '@/lib/types';
@@ -40,8 +41,8 @@ export default function Checkout() {
       });
       setSecs(holdMinutes * 60);
       await api(`/bookings/${booking.id}/pay`, { method: 'POST', body: { method } });
-      Alert.alert('Reserva confirmada! ✅', 'Faça o check-in no dia para ganhar pontos.');
-      router.dismissTo('/agendar');
+      notify('Reserva confirmada! ✅', 'Faça o check-in no dia para ganhar pontos.');
+      router.dismissTo('/');
     } catch (e) {
       setError(errMsg(e));
     } finally {

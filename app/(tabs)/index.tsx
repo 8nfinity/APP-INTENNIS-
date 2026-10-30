@@ -1,148 +1,332 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Logo } from '@/components/Logo';
-import { Avatar, Button, Card, Gauge, H1, Muted, Screen, StatTile, Text, Title } from '@/components/ui';
-import { api, errMsg, useFetch } from '@/lib/api';
-import { useAuth, useMe } from '@/lib/auth';
-import { fmtDate, levelFor } from '@/lib/game';
-import { colors, space } from '@/lib/theme';
-import { Booking, Court, Player } from '@/lib/types';
+import { Button, Card, Chip, ErrorState, H1, Muted, Screen, Text, formatBRL } from '@/components/ui';
+import { useFetch } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { checkinInfo, doCheckIn, pad2 } from '@/lib/booking';
+import { fmtDate, toISO } from '@/lib/game';
+import { colors, radius, space } from '@/lib/theme';
+import { Booking, BookingKind, Court } from '@/lib/types';
 
-export default function Inicio() {
-  const me = useMe();
+const WEEK = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+const WEEK_LONG = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+type Summary = { days: { date: string; taken: number }[]; slotsPerDay: number };
+
+const parse = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+const addDays = (iso: string, n: number) => {
+  const d = parse(iso);
+  d.setDate(d.getDate() + n);
+  return toISO(d);
+};
+
+// cor do pontinho de ocupação: livre, enchendo, lotado
+function occColor(taken: number, total: number) {
+  if (!total) return colors.muted;
+  const r = taken / total;
+  return r >= 0.95 ? colors.danger : r >= 0.6 ? colors.hot : colors.accent;
+}
+
+export default function Agendar() {
   const { refreshPlayer } = useAuth();
-  const rankQ = useFetch<{ players: Player[] }>('/ranking');
-  const bookingsQ = useFetch<{ bookings: Booking[] }>('/bookings');
-  const courtsQ = useFetch<{ courts: Court[] }>('/courts');
+  const today = toISO(new Date());
+  const [date, setDate] = useState(today);
+  const [cursor, setCursor] = useState(() => ({ y: new Date().getFullYear(), m: new Date().getMonth() }));
+  const [kind, setKind] = useState<BookingKind>('jogo');
 
-  const lvl = levelFor(me.points);
-  const pos = (rankQ.data?.players ?? []).findIndex((p) => p.id === me.id) + 1;
-  const next = (bookingsQ.data?.bookings ?? [])
-    .filter((b) => b.status === 'pago')
-    .sort((a, b) => (a.date + String(a.hour).padStart(2, '0')).localeCompare(b.date + String(b.hour).padStart(2, '0')))[0];
-  const courtName = (id: string) => courtsQ.data?.courts.find((c) => c.id === id)?.name ?? '';
+  const courtsQ = useFetch<{ courts: Court[]; hours: number[]; classExtra: number; maxDaysAhead: number }>('/courts');
+  const maxDate = addDays(today, courtsQ.data?.maxDaysAhead ?? 365);
+
+  const monthStart = toISO(new Date(cursor.y, cursor.m, 1));
+  const daysInMonth = new Date(cursor.y, cursor.m + 1, 0).getDate();
+  const monthFrom = monthStart < today ? today : monthStart;
+  const monthDays = Math.max(1, daysInMonth - parse(monthFrom).getDate() + 1);
+
+  const stripQ = useFetch<Summary>(`/availability/summary?from=${today}&days=30`);
+  const monthQ = useFetch<Summary>(`/availability/summary?from=${monthFrom}&days=${monthDays}`);
+  const dayQ = useFetch<{ taken: { courtId: string; hour: number }[] }>(`/availability?date=${date}`);
+  const bookingsQ = useFetch<{ bookings: Booking[] }>('/bookings');
+
+  const courts = courtsQ.data?.courts ?? [];
+  const hours = courtsQ.data?.hours ?? [];
+  const extra = kind === 'aula' ? (courtsQ.data?.classExtra ?? 0) : 0;
+  const now = new Date();
+
+  const takenOn = (q: typeof stripQ, iso: string) => q.data?.days.find((d) => d.date === iso)?.taken ?? 0;
+  const myOn = (bookingsQ.data?.bookings ?? []).filter((b) => b.date === date && (b.status === 'pago' || b.status === 'concluido'));
+
+  const pick = (iso: string) => {
+    setDate(iso);
+    const d = parse(iso);
+    setCursor({ y: d.getFullYear(), m: d.getMonth() });
+  };
+
+  const canPrev = cursor.y > now.getFullYear() || (cursor.y === now.getFullYear() && cursor.m > now.getMonth());
+  const nextMonthStart = toISO(new Date(cursor.y, cursor.m + 1, 1));
+  const canNext = nextMonthStart <= maxDate;
+  const move = (delta: number) => {
+    const d = new Date(cursor.y, cursor.m + delta, 1);
+    setCursor({ y: d.getFullYear(), m: d.getMonth() });
+  };
+
+  const book = (court: Court, hour: number) =>
+    router.push({ pathname: '/checkout', params: { courtId: court.id, date, hour: String(hour), kind } });
 
   const checkIn = async (id: string) => {
-    try {
-      const { points } = await api<{ points: number }>(`/bookings/${id}/checkin`, { method: 'POST' });
-      Alert.alert('Presença confirmada! 🎾', `Você ganhou +${points} pontos no ranking.`);
+    if (await doCheckIn(id)) {
       bookingsQ.reload();
       refreshPlayer();
-    } catch (e) {
-      Alert.alert('Check-in', errMsg(e));
     }
   };
 
   const reload = () => {
-    rankQ.reload();
+    courtsQ.reload();
+    stripQ.reload();
+    monthQ.reload();
+    dayQ.reload();
     bookingsQ.reload();
-    refreshPlayer();
   };
+
+  // grade do mês: espaços vazios até o 1º dia da semana
+  const firstDow = new Date(cursor.y, cursor.m, 1).getDay();
+  const cells: (string | null)[] = [
+    ...Array.from({ length: firstDow }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => toISO(new Date(cursor.y, cursor.m, i + 1))),
+  ];
+  const strip = Array.from({ length: 30 }, (_, i) => addDays(today, i));
+  const wide = courts.length > 3; // muitas quadras: o mapa rola para o lado
+  const colStyle = wide ? { width: 104 } : { flex: 1 };
 
   return (
     <Screen tab refreshing={false} onRefresh={reload}>
       <View style={s.top}>
-        <Logo size={24} />
-        <View style={s.topRight}>
-          {me.isAdmin && (
-            <Pressable onPress={() => router.push('/admin')} style={s.adminBtn} hitSlop={8}>
-              <Ionicons name="shield-checkmark" size={16} color={colors.onAccent} />
-              <Text style={s.adminText}>Admin</Text>
-            </Pressable>
-          )}
-          <Pressable onPress={() => router.push('/perfil')} hitSlop={8}>
-            <Avatar name={me.name} url={me.avatarUrl} size={44} />
+        <Logo size={22} />
+      </View>
+      <H1 style={{ fontSize: 40, lineHeight: 42 }}>Reserve{'\n'}sua quadra</H1>
+
+      <View style={s.row}>
+        <Chip label="Jogo livre" active={kind === 'jogo'} onPress={() => setKind('jogo')} />
+        <Chip label="Aula com professor" active={kind === 'aula'} onPress={() => setKind('aula')} />
+      </View>
+
+      {courtsQ.error && <ErrorState message={courtsQ.error} onRetry={reload} />}
+
+      {/* Próximos 30 dias: quantos horários livres em cada dia */}
+      <View style={{ gap: space.sm }}>
+        <Text style={s.section}>Próximos 30 dias</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingRight: space.lg }}>
+          {strip.map((iso) => {
+            const d = parse(iso);
+            const on = iso === date;
+            const total = stripQ.data?.slotsPerDay ?? 0;
+            const free = Math.max(0, total - takenOn(stripQ, iso));
+            return (
+              <Pressable key={iso} onPress={() => pick(iso)} style={[s.stripDay, on && s.stripOn]}>
+                <Text style={[s.stripWeek, on && { color: colors.onAccent }]}>{iso === today ? 'Hoje' : WEEK_LONG[d.getDay()]}</Text>
+                <Text style={[s.stripNum, on && { color: colors.onAccent }]}>{d.getDate()}</Text>
+                <View style={[s.stripDot, { backgroundColor: on ? colors.onAccent : occColor(total - free, total) }]} />
+                <Text style={[s.stripFree, on && { color: colors.onAccent }]}>{stripQ.data ? `${free} livres` : ' '}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Calendário do mês (referência 1), navegável até 1 ano */}
+      <Card style={{ gap: space.md }}>
+        <View style={s.monthHead}>
+          <Pressable onPress={() => canPrev && move(-1)} hitSlop={12} style={{ opacity: canPrev ? 1 : 0.25 }}>
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </Pressable>
+          <Text style={s.monthTitle}>
+            {MONTHS[cursor.m]} <Text style={{ color: colors.muted, fontWeight: '600' }}>{cursor.y}</Text>
+          </Text>
+          <Pressable onPress={() => canNext && move(1)} hitSlop={12} style={{ opacity: canNext ? 1 : 0.25 }}>
+            <Ionicons name="arrow-forward" size={22} color={colors.text} />
           </Pressable>
         </View>
-      </View>
-
-      <View style={{ gap: 4 }}>
-        <Muted style={{ fontSize: 15 }}>Olá,</Muted>
-        <H1 style={{ fontSize: 40, lineHeight: 42 }}>{me.name.split(' ')[0]}</H1>
-      </View>
-
-      <Card hero style={{ gap: space.md }}>
-        <Text style={s.heroTitle}>Seus{'\n'}pontos</Text>
-        <View style={{ alignItems: 'center' }}>
-          <Gauge value={lvl.progress} size={240}>
-            <Text style={s.gaugeNum}>{me.points}</Text>
-            <Text style={s.gaugeUnit}>pts</Text>
-          </Gauge>
+        <View style={s.weekRow}>
+          {WEEK.map((w, i) => (
+            <Text key={i} style={s.weekDay}>
+              {w}
+            </Text>
+          ))}
         </View>
-        <View style={s.levelPill}>
-          <Ionicons name="shield-checkmark" size={18} color={colors.accent} />
-          <Text style={s.levelText}>
-            <Text style={{ color: colors.accent, fontWeight: '800' }}>{lvl.current.name}</Text>
-            {lvl.next ? `  ·  faltam ${lvl.toNext} pts para ${lvl.next.name}` : '  ·  nível máximo'}
-          </Text>
+        <View style={s.grid}>
+          {cells.map((iso, i) => {
+            if (!iso) return <View key={`e${i}`} style={s.cell} />;
+            const off = iso < today || iso > maxDate;
+            const on = iso === date;
+            const total = monthQ.data?.slotsPerDay ?? 0;
+            return (
+              <Pressable key={iso} disabled={off} onPress={() => pick(iso)} style={s.cell}>
+                <View style={[s.dayCircle, on && s.dayOn, iso === today && !on && s.dayToday]}>
+                  <Text style={[s.dayNum, off && { color: 'rgba(244,243,236,0.25)' }, on && { color: colors.onAccent, fontWeight: '900' }]}>
+                    {parse(iso).getDate()}
+                  </Text>
+                </View>
+                {!off && <View style={[s.dot, { backgroundColor: on ? 'transparent' : occColor(takenOn(monthQ, iso), total) }]} />}
+              </Pressable>
+            );
+          })}
         </View>
-        <Pressable onPress={() => router.push('/ranking')} style={s.slide}>
-          <View style={s.slideDot}>
-            <Ionicons name="trophy" size={20} color={colors.onAccent} />
-          </View>
-          <Text style={s.slideText}>Ver ranking  ›››</Text>
-        </Pressable>
+        <View style={s.legend}>
+          <Legend color={colors.accent} label="Livre" />
+          <Legend color={colors.hot} label="Enchendo" />
+          <Legend color={colors.danger} label="Lotado" />
+        </View>
       </Card>
 
-      <View style={s.grid}>
-        <StatTile value={pos ? `#${pos}` : '-'} label="Ranking" accent />
-        <StatTile value={String(me.wins)} label="Vitórias" />
-        <StatTile value={String(me.classes)} label="Aulas" />
-        <StatTile value={String(me.streak)} label="Sequência 🔥" />
+      {/* Mapa completo do dia: todas as quadras x todos os horários */}
+      <View style={{ gap: space.sm }}>
+        <Text style={s.section}>
+          Mapa de {date === today ? 'hoje' : fmtDate(date)}
+          <Text style={{ color: colors.muted, fontSize: 15, fontWeight: '600' }}>  · {WEEK_LONG[parse(date).getDay()]}</Text>
+        </Text>
+        <Muted>Toque num horário livre para reservar. {kind === 'aula' ? `Aula: +${formatBRL(extra)} pelo professor.` : ''}</Muted>
       </View>
 
-      {next ? (
-        <Card glow style={{ gap: space.md }}>
-          <Muted>Próximo horário</Muted>
-          <Title style={{ fontSize: 26 }}>
-            {fmtDate(next.date)} · {String(next.hour).padStart(2, '0')}:00
-          </Title>
-          <Muted>
-            {next.kind === 'aula' ? 'Aula' : 'Jogo'} · {courtName(next.courtId)}
-          </Muted>
-          <Button label="Fazer check-in" arrow onPress={() => checkIn(next.id)} />
-        </Card>
-      ) : (
-        <Card glow style={{ gap: space.md }}>
-          <Title style={{ fontSize: 24 }}>Hora de jogar?</Title>
-          <Muted>Reserve uma quadra e ganhe pontos a cada check-in.</Muted>
-          <Button label="Reservar quadra" arrow onPress={() => router.push('/agendar')} />
-        </Card>
+      <ScrollView horizontal={wide} scrollEnabled={wide} showsHorizontalScrollIndicator={false}>
+        <View style={{ gap: 6, flex: 1, minWidth: '100%' }}>
+          <View style={s.mapRow}>
+            <View style={s.mapHour} />
+            {courts.map((c) => (
+              <View key={c.id} style={[s.mapHead, colStyle]}>
+                <Text style={s.mapCourt} numberOfLines={1}>
+                  {c.name}
+                </Text>
+                <Text style={s.mapSurface}>{c.surface}</Text>
+              </View>
+            ))}
+          </View>
+          {hours.map((h) => (
+            <View key={h} style={s.mapRow}>
+              <Text style={s.mapHour}>{pad2(h)}h</Text>
+              {courts.map((c) => {
+                const mine = myOn.find((b) => b.courtId === c.id && b.hour === h);
+                const past = date === today && h <= now.getHours();
+                const taken = !!dayQ.data?.taken.some((t) => t.courtId === c.id && t.hour === h);
+                if (mine) {
+                  return (
+                    <View key={c.id} style={[s.cell2, colStyle, s.cellMine]}>
+                      <Text style={s.cellMineText}>Você</Text>
+                    </View>
+                  );
+                }
+                if (past || taken) {
+                  return (
+                    <View key={c.id} style={[s.cell2, colStyle, s.cellTaken]}>
+                      <Text style={s.cellTakenText}>{past ? '—' : 'Ocupado'}</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <Pressable key={c.id} onPress={() => book(c, h)} style={({ pressed }) => [s.cell2, colStyle, s.cellFree, pressed && { borderColor: colors.accent }]}>
+                    <Text style={s.cellPrice}>{formatBRL(c.pricePerHour + extra).replace(',00', '')}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+
+      {myOn.length > 0 && (
+        <View style={{ gap: space.sm }}>
+          <Text style={s.section}>Suas reservas neste dia</Text>
+          {myOn.map((b) => {
+            const ci = checkinInfo(b);
+            return (
+              <Card key={b.id} glow style={{ gap: space.md }}>
+                <View style={s.between}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.bookTitle}>
+                      {pad2(b.hour)}:00 · {courts.find((c) => c.id === b.courtId)?.name ?? ''}
+                    </Text>
+                    <Muted>
+                      {b.kind === 'aula' ? 'Aula' : 'Jogo'} · {formatBRL(b.price)}
+                    </Muted>
+                  </View>
+                </View>
+                {ci.state === 'open' ? (
+                  <Button label="Fazer check-in" arrow onPress={() => checkIn(b.id)} />
+                ) : (
+                  <Text style={[s.ciInfo, ci.state === 'done' && { color: colors.success }]}>{ci.label}</Text>
+                )}
+              </Card>
+            );
+          })}
+        </View>
       )}
     </Screen>
   );
 }
 
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={[s.dot, { backgroundColor: color, marginTop: 0 }]} />
+      <Muted style={{ fontSize: 12 }}>{label}</Muted>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  adminBtn: {
-    flexDirection: 'row',
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.md },
+  section: { color: colors.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.6 },
+
+  stripDay: {
+    width: 76,
+    paddingVertical: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.accent,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 999,
+    gap: 3,
+    backgroundColor: 'rgba(244,243,236,0.06)',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  adminText: { color: colors.onAccent, fontWeight: '800', fontSize: 12 },
-  heroTitle: { color: colors.cream, fontSize: 40, fontWeight: '900', letterSpacing: -2, lineHeight: 40 },
-  gaugeNum: { color: colors.cream, fontSize: 62, fontWeight: '900', letterSpacing: -3, lineHeight: 64 },
-  gaugeUnit: { color: colors.cream, fontSize: 18, fontWeight: '800', opacity: 0.7, marginTop: -4 },
-  levelPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.bg,
-    borderRadius: 999,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-  },
-  levelText: { color: colors.text, fontSize: 14, flex: 1 },
-  slide: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg, borderRadius: 999, padding: 6, gap: 12 },
-  slideDot: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  slideText: { color: colors.text, fontWeight: '800', fontSize: 15 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+  stripOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  stripWeek: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  stripNum: { color: colors.text, fontSize: 26, fontWeight: '900', letterSpacing: -1 },
+  stripDot: { width: 6, height: 6, borderRadius: 3 },
+  stripFree: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+
+  monthHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  monthTitle: { color: colors.text, fontSize: 20, fontWeight: '800' },
+  weekRow: { flexDirection: 'row' },
+  weekDay: { flex: 1, textAlign: 'center', color: colors.muted, fontSize: 12, fontWeight: '700' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  cell: { width: `${100 / 7}%`, alignItems: 'center', paddingVertical: 4, minHeight: 50 },
+  dayCircle: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  dayOn: { backgroundColor: colors.accent },
+  dayToday: { borderWidth: 1, borderColor: colors.accent },
+  dayNum: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  dot: { width: 5, height: 5, borderRadius: 3, marginTop: 3 },
+  legend: { flexDirection: 'row', justifyContent: 'center', gap: space.lg },
+
+  mapRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  mapHour: { width: 40, color: colors.muted, fontSize: 13, fontWeight: '700' },
+  mapHead: { alignItems: 'center', paddingVertical: 6 },
+  mapCourt: { color: colors.text, fontSize: 13, fontWeight: '800' },
+  mapSurface: { color: colors.muted, fontSize: 11 },
+  cell2: { height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cellFree: { backgroundColor: 'rgba(244,243,236,0.07)', borderWidth: 1, borderColor: 'rgba(212,242,60,0.35)' },
+  cellTaken: { backgroundColor: 'rgba(244,243,236,0.025)' },
+  cellMine: { backgroundColor: colors.accent },
+  cellPrice: { color: colors.text, fontSize: 13, fontWeight: '800' },
+  cellTakenText: { color: 'rgba(244,243,236,0.3)', fontSize: 12, fontWeight: '600' },
+  cellMineText: { color: colors.onAccent, fontSize: 13, fontWeight: '900' },
+
+  bookTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
+  ciInfo: { color: colors.muted, fontSize: 14, fontWeight: '700' },
 });

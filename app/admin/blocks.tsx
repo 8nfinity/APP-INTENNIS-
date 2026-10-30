@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Button, Card, Chip, Empty, ErrorText, Field, Loading, Muted, Screen, Text, Title } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
+import { confirmAsk, notify } from '@/lib/dialog';
 import { fmtDate, toISO } from '@/lib/game';
 import { colors, space } from '@/lib/theme';
 import { Court, CourtBlock } from '@/lib/types';
@@ -49,21 +50,15 @@ export default function AdminBlocks() {
     if (failed.length) setError(`Não foi possível bloquear: ${failed.join('; ')}`);
   };
 
-  const unblock = (b: CourtBlock) =>
-    Alert.alert('Liberar horário?', `${b.courtName} · ${fmtDate(b.date)} às ${String(b.hour).padStart(2, '0')}:00`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Liberar',
-        onPress: async () => {
-          try {
-            await api(`/admin/blocks/${b.id}`, { method: 'DELETE' });
-            blocksQ.reload();
-          } catch (e) {
-            Alert.alert('Erro', errMsg(e));
-          }
-        },
-      },
-    ]);
+  const unblock = async (b: CourtBlock) => {
+    if (!(await confirmAsk('Liberar horário?', `${b.courtName} · ${fmtDate(b.date)} às ${String(b.hour).padStart(2, '0')}:00`, 'Liberar'))) return;
+    try {
+      await api(`/admin/blocks/${b.id}`, { method: 'DELETE' });
+      blocksQ.reload();
+    } catch (e) {
+      notify('Erro', errMsg(e));
+    }
+  };
 
   return (
     <Screen padTop={false} refreshing={false} onRefresh={blocksQ.reload}>

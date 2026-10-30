@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button, Card, Chip, ErrorText, Field, Muted, Screen, Title } from '@/components/ui';
 import { api, errMsg } from '@/lib/api';
+import { notify } from '@/lib/dialog';
 import { colors, space } from '@/lib/theme';
 
 export default function MatchResult() {
@@ -18,7 +19,7 @@ export default function MatchResult() {
     setError(null);
     try {
       await api(`/matches/${matchId}/report`, { method: 'POST', body: { result, score: score.trim() } });
-      Alert.alert('Resultado enviado', `${name} precisa confirmar para os pontos serem somados.`);
+      notify('Resultado enviado', `${name} precisa confirmar para os pontos serem somados.`);
       router.back();
     } catch (e) {
       setError(errMsg(e));

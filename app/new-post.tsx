@@ -1,11 +1,12 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 import { Button, Chip, ErrorText, Field, Muted, Screen, Text } from '@/components/ui';
 import { api, errMsg } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { notify } from '@/lib/dialog';
 import { IMAGE_TYPES, VIDEO_TYPES, uploadAsset } from '@/lib/media';
 import { colors, radius, space } from '@/lib/theme';
 import { Post } from '@/lib/types';
@@ -30,7 +31,7 @@ export default function NewPost() {
   const pick = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permissão necessária', 'Autorize o acesso às fotos para anexar mídia.');
+      notify('Permissão necessária', 'Autorize o acesso às fotos para anexar mídia.');
       return;
     }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 0.8 });

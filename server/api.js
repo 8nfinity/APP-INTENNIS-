@@ -5,6 +5,7 @@ const CLASS_EXTRA = 60;
 const POINTS = { match_win: 30, match_loss: 10, booking_jogo: 10, booking_aula: 20 };
 const DAILY_MATCH_POINT_CAP = 3; // partidas que pontuam por dia, evita "farmar" ponto
 const PENDING_MINUTES = 15;
+const MAX_DAYS_AHEAD = 365; // dá para reservar com até 1 ano de antecedência
 const TZ = 'America/Sao_Paulo';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -164,7 +165,7 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     const { rows } = await pool.query(
       'select id, name, surface, price_per_hour::float as "pricePerHour" from courts where active order by id',
     );
-    res.json({ courts: rows, hours: HOURS, classExtra: CLASS_EXTRA });
+    res.json({ courts: rows, hours: HOURS, classExtra: CLASS_EXTRA, maxDaysAhead: MAX_DAYS_AHEAD });
   }));
 
   async function expirePending() {
@@ -189,6 +190,28 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     res.json({ taken: rows });
   }));
 
+  // Ocupação por dia (para o calendário e o mapa dos próximos dias).
+  r.get('/availability/summary', wrap(async (req, res) => {
+    const from = String(req.query.from || '');
+    const days = Math.min(62, Math.max(1, Number(req.query.days) || 30));
+    if (!DATE.test(from)) throw bad('Data inválida');
+    const to = addDays(from, days - 1);
+    await expirePending();
+    const { rows } = await pool.query(
+      `select to_char(date,'YYYY-MM-DD') as date, count(*)::int as taken from (
+         select date, court_id, hour from bookings
+           where status in ('pendente','pago','concluido') and date between $1 and $2
+         union
+         select date, court_id, hour from court_blocks where date between $1 and $2
+       ) t
+       where court_id in (select id from courts where active)
+       group by date`,
+      [from, to],
+    );
+    const active = (await pool.query('select count(*)::int as n from courts where active')).rows[0].n;
+    res.json({ days: rows, slotsPerDay: active * HOURS.length });
+  }));
+
   r.get('/bookings', wrap(async (req, res) => {
     const p = await needMe(req);
     await expirePending();
@@ -209,7 +232,9 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     if (typeof courtId !== 'string' || !DATE.test(String(date)) || !['jogo', 'aula'].includes(kind)) throw bad('Dados inválidos');
     if (!HOURS.includes(hour)) throw bad('Horário inválido');
     const today = nowSp();
-    if (date < today.date || date > addDays(today.date, 30)) throw bad('Data fora do período de reserva');
+    if (date < today.date || date > addDays(today.date, MAX_DAYS_AHEAD)) {
+      throw bad('Dá para reservar com até 1 ano de antecedência');
+    }
     if (date === today.date && hour <= today.hour) throw bad('Esse horário já passou');
 
     const court = (await pool.query('select id, price_per_hour::float as price from courts where id = $1 and active', [courtId])).rows[0];

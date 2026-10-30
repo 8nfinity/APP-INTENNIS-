@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Avatar, Button, Card, Chip, Empty, ErrorState, H1, Loading, Muted, ProgressBar, Screen, Text, Title } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { notify } from '@/lib/dialog';
 import { POINTS, TOURNAMENT_SPOTS, levelFor } from '@/lib/game';
 import { colors, radius, space } from '@/lib/theme';
 import { MatchRow, Player } from '@/lib/types';
@@ -63,10 +64,10 @@ export default function Ranking() {
   const challenge = async (p: Player) => {
     try {
       await api('/matches', { method: 'POST', body: { opponentId: p.id } });
-      Alert.alert('Desafio criado! ⚔️', `Combinem o jogo com ${p.name}. Vitória vale +${POINTS.vitoria} pontos.`);
+      notify('Desafio criado! ⚔️', `Combinem o jogo com ${p.name}. Vitória vale +${POINTS.vitoria} pontos.`);
       matchQ.reload();
     } catch (e) {
-      Alert.alert('Desafio', errMsg(e));
+      notify('Desafio', errMsg(e));
     }
   };
 
@@ -75,7 +76,7 @@ export default function Ranking() {
       await api(`/matches/${m.id}/confirm`, { method: 'POST', body: { accept } });
       reload();
     } catch (e) {
-      Alert.alert('Confirmação', errMsg(e));
+      notify('Confirmação', errMsg(e));
     }
   };
 

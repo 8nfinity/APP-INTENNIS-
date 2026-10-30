@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Alert, Image, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Image, Pressable, Share, StyleSheet, View } from 'react-native';
 
 import { Avatar, Button, Card, Empty, ErrorState, H1, Loading, Muted, Screen, Text } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { confirmAsk, notify } from '@/lib/dialog';
 import { timeAgo } from '@/lib/game';
 import { colors, radius, space } from '@/lib/theme';
 import { Post } from '@/lib/types';
@@ -26,26 +27,19 @@ export default function Social() {
       await api(`/posts/${id}/kudos`, { method: 'POST' });
       reload();
     } catch (e) {
-      Alert.alert('Kudos', errMsg(e));
+      notify('Kudos', errMsg(e));
     }
   };
 
-  const remove = (id: string) =>
-    Alert.alert('Apagar publicação?', 'Essa ação não pode ser desfeita.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Apagar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api(`/posts/${id}`, { method: 'DELETE' });
-            reload();
-          } catch (e) {
-            Alert.alert('Erro', errMsg(e));
-          }
-        },
-      },
-    ]);
+  const remove = async (id: string) => {
+    if (!(await confirmAsk('Apagar publicação?', 'Essa ação não pode ser desfeita.', 'Apagar', true))) return;
+    try {
+      await api(`/posts/${id}`, { method: 'DELETE' });
+      reload();
+    } catch (e) {
+      notify('Erro', errMsg(e));
+    }
+  };
 
   const share = (p: Post) => Share.share({ message: `${p.authorName} no In Tennis Club: ${p.text}` }).catch(() => {});
 

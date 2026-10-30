@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button, Card, Chip, Empty, ErrorText, Field, Loading, Muted, Screen, Text, Title } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
+import { confirmAsk, notify } from '@/lib/dialog';
 import { fmtDate } from '@/lib/game';
 import { colors, space } from '@/lib/theme';
 import { GameEvent } from '@/lib/types';
@@ -47,7 +48,7 @@ export default function AdminEvents() {
       setPlace('');
       setDate('');
       reload();
-      Alert.alert('Evento publicado', 'Ele já aparece na aba Eventos.');
+      notify('Evento publicado', 'Ele já aparece na aba Eventos.');
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -55,22 +56,15 @@ export default function AdminEvents() {
     }
   };
 
-  const remove = (e: GameEvent) =>
-    Alert.alert('Apagar evento?', e.title, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Apagar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api(`/admin/events/${e.id}`, { method: 'DELETE' });
-            reload();
-          } catch (err) {
-            Alert.alert('Erro', errMsg(err));
-          }
-        },
-      },
-    ]);
+  const remove = async (e: GameEvent) => {
+    if (!(await confirmAsk('Apagar evento?', e.title, 'Apagar', true))) return;
+    try {
+      await api(`/admin/events/${e.id}`, { method: 'DELETE' });
+      reload();
+    } catch (err) {
+      notify('Erro', errMsg(err));
+    }
+  };
 
   return (
     <Screen padTop={false} refreshing={false} onRefresh={reload}>

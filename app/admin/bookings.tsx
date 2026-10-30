@@ -1,8 +1,9 @@
-import { Pressable, View, Alert } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useState } from 'react';
 
 import { Button, Card, Chip, Empty, ErrorState, Loading, Muted, Screen, Text, formatBRL } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
+import { confirmAsk, notify } from '@/lib/dialog';
 import { fmtDate, toISO } from '@/lib/game';
 import { colors, space } from '@/lib/theme';
 import { AdminBooking } from '@/lib/types';
@@ -27,22 +28,21 @@ export default function AdminBookings() {
   const [date, setDate] = useState(days[0].iso);
   const { data, error, loading, reload } = useFetch<{ bookings: AdminBooking[] }>(`/admin/bookings?date=${date}`);
 
-  const cancel = (b: AdminBooking) =>
-    Alert.alert('Cancelar reserva?', `${b.playerName} · ${b.courtName} às ${String(b.hour).padStart(2, '0')}:00. O horário volta a ficar livre.`, [
-      { text: 'Voltar', style: 'cancel' },
-      {
-        text: 'Cancelar reserva',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api(`/admin/bookings/${b.id}/cancel`, { method: 'POST' });
-            reload();
-          } catch (e) {
-            Alert.alert('Erro', errMsg(e));
-          }
-        },
-      },
-    ]);
+  const cancel = async (b: AdminBooking) => {
+    const ok = await confirmAsk(
+      'Cancelar reserva?',
+      `${b.playerName} · ${b.courtName} às ${String(b.hour).padStart(2, '0')}:00. O horário volta a ficar livre.`,
+      'Cancelar reserva',
+      true,
+    );
+    if (!ok) return;
+    try {
+      await api(`/admin/bookings/${b.id}/cancel`, { method: 'POST' });
+      reload();
+    } catch (e) {
+      notify('Erro', errMsg(e));
+    }
+  };
 
   return (
     <Screen padTop={false} refreshing={false} onRefresh={reload}>

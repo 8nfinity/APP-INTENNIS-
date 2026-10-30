@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar, Button, ErrorText, Field, Muted, Screen } from '@/components/ui';
 import { api, errMsg } from '@/lib/api';
 import { useAuth, useMe } from '@/lib/auth';
+import { notify } from '@/lib/dialog';
 import { IMAGE_TYPES, uploadAsset } from '@/lib/media';
 import { colors, space } from '@/lib/theme';
 
@@ -26,7 +27,7 @@ export default function EditProfile() {
     if (!session) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permissão necessária', 'Autorize o acesso às fotos para escolher sua foto de perfil.');
+      notify('Permissão necessária', 'Autorize o acesso às fotos para escolher sua foto de perfil.');
       return;
     }
     const res = await ImagePicker.launchImageLibraryAsync({

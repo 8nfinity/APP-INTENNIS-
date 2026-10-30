@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Alert, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
 
 import { Button, Card, ErrorState, ErrorText, Field, Loading, Muted, Screen, Text, Title, formatBRL } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
+import { notify } from '@/lib/dialog';
 import { colors, space } from '@/lib/theme';
 import { AdminCourt } from '@/lib/types';
 
@@ -85,7 +86,7 @@ export default function AdminCourts() {
       setSurface('');
       setPrice('');
       reload();
-      Alert.alert('Quadra criada', 'Ela já aparece para os jogadores.');
+      notify('Quadra criada', 'Ela já aparece para os jogadores.');
     } catch (e) {
       setFormError(errMsg(e));
     } finally {

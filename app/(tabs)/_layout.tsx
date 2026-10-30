@@ -37,12 +37,11 @@ export default function TabLayout() {
           borderColor: colors.border,
         },
       }}>
-      <Tabs.Screen name="index" options={tab('Início', 'home', 'home-outline')} />
-      <Tabs.Screen name="agendar" options={tab('Agendar', 'tennisball', 'tennisball-outline')} />
+      <Tabs.Screen name="index" options={tab('Agendar', 'tennisball', 'tennisball-outline')} />
       <Tabs.Screen name="ranking" options={tab('Ranking', 'trophy', 'trophy-outline')} />
       <Tabs.Screen name="eventos" options={tab('Eventos', 'calendar', 'calendar-outline')} />
       <Tabs.Screen name="social" options={tab('Social', 'people', 'people-outline')} />
-      <Tabs.Screen name="perfil" options={{ href: null }} />
+      <Tabs.Screen name="perfil" options={tab('Perfil', 'person', 'person-outline')} />
     </Tabs>
   );
 }

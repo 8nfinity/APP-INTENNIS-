@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Avatar, Button, Card, Empty, ErrorText, Field, Loading, Muted, Screen, Text } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
 import { useMe } from '@/lib/auth';
+import { confirmAsk, notify } from '@/lib/dialog';
 import { colors, space } from '@/lib/theme';
 import { Player } from '@/lib/types';
 
@@ -28,21 +29,16 @@ function PlayerCard({ p, isMe, onChanged }: { p: Player; isMe: boolean; onChange
     }
   };
 
-  const toggleAdmin = () =>
-    Alert.alert(p.isAdmin ? 'Remover administrador?' : 'Tornar administrador?', `${p.name} (@${p.username})`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Confirmar',
-        onPress: async () => {
-          try {
-            await api(`/admin/players/${p.id}/admin`, { method: 'POST', body: { isAdmin: !p.isAdmin } });
-            onChanged();
-          } catch (e) {
-            Alert.alert('Erro', errMsg(e));
-          }
-        },
-      },
-    ]);
+  const toggleAdmin = async () => {
+    const ok = await confirmAsk(p.isAdmin ? 'Remover administrador?' : 'Tornar administrador?', `${p.name} (@${p.username})`);
+    if (!ok) return;
+    try {
+      await api(`/admin/players/${p.id}/admin`, { method: 'POST', body: { isAdmin: !p.isAdmin } });
+      onChanged();
+    } catch (e) {
+      notify('Erro', errMsg(e));
+    }
+  };
 
   return (
     <Card style={{ gap: space.md }}>
