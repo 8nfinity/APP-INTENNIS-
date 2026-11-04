@@ -19,18 +19,30 @@
 
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
-      /* These styles make the body full-height */
       html,
       body {
         height: 100%;
         background-color: #0a0d0b;
+        /* iPhone: não aumenta o texto sozinho ao girar a tela */
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        /* sem zoom por toque duplo e sem atraso no toque */
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
       }
-      /* These styles disable body scrolling if you are using <ScrollView> */
+      /* dvh acompanha a barra do navegador do celular (100vh deixava o rodapé cortado) */
+      @supports (height: 100dvh) {
+        html,
+        body,
+        #root {
+          height: 100dvh;
+        }
+      }
       body {
         overflow: hidden;
+        /* sem "puxar para recarregar" nem efeito elástico atrás do app */
         overscroll-behavior: none;
       }
-      /* These styles make the root element full-height */
       #root {
         display: flex;
         height: 100%;

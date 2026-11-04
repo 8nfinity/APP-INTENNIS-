@@ -81,8 +81,9 @@ export default function Signup() {
         secureTextEntry
         autoComplete="new-password"
         textContentType="newPassword"
-        placeholder="Mínimo 8 caracteres, com letras e números"
+        placeholder="Mínimo 8 caracteres"
       />
+      <Muted style={{ marginTop: -8 }}>Use letras e números.</Muted>
       <Field
         label="Repita a senha"
         value={confirm}

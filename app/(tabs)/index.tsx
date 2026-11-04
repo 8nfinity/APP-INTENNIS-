@@ -9,6 +9,7 @@ import { Avatar, Button, Card, Chip, ErrorState, Muted, Screen, Section, Stepper
 import { useFetch } from '@/lib/api';
 import { pad2 } from '@/lib/booking';
 import { toISO } from '@/lib/game';
+import { useLayout } from '@/lib/layout';
 import { colors, radius, space } from '@/lib/theme';
 import { BookingKind, Court, Teacher } from '@/lib/types';
 
@@ -61,6 +62,12 @@ export default function Agendar() {
   const court = courts.find((c) => c.id === courtId) ?? courts[0];
   const price = court ? court.pricePerHour + (teacher ? teacher.pricePerHour : 0) : 0;
   const now = new Date();
+
+  // medidas que acompanham a largura do aparelho
+  const { contentW, compact } = useLayout();
+  const cols = contentW < 300 ? 3 : contentW < 440 ? 4 : 6; // colunas da grade de horários
+  const timeW = Math.floor((contentW - space.sm * (cols - 1)) / cols);
+  const dayD = Math.max(28, Math.min(36, Math.floor((contentW - 34) / 7))); // diâmetro do dia no calendário
   const noTeacher = kind === 'aula' && !teacher;
 
   // indisponível: horário passado, quadra ocupada ou (aula) professor já ocupado
@@ -121,7 +128,7 @@ export default function Agendar() {
       {/* Cartão do "serviço" (referência LUXE) */}
       {court && (
         <Card style={s.service}>
-          <CourtArt surface={court.surface} size={96} />
+          <CourtArt surface={court.surface} size={compact ? 76 : 96} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={s.serviceName}>
               {court.name} · {court.surface}
@@ -142,7 +149,8 @@ export default function Agendar() {
         </Card>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+      {/* quebra em linhas em vez de rolar para o lado: nenhuma quadra fica escondida na borda */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
         {courts.map((c) => (
           <Chip
             key={c.id}
@@ -154,7 +162,7 @@ export default function Agendar() {
             }}
           />
         ))}
-      </ScrollView>
+      </View>
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <Chip label="Jogo livre" icon="tennisball-outline" active={kind === 'jogo'} onPress={() => setKind('jogo')} />
         <Chip
@@ -231,7 +239,7 @@ export default function Agendar() {
             const dot = off ? null : occ(iso);
             return (
               <Pressable key={iso} disabled={off} onPress={() => pickDate(iso)} style={s.cell}>
-                <View style={[s.dayCircle, on && s.dayOn]}>
+                <View style={[s.dayCircle, { width: dayD, height: dayD, borderRadius: dayD / 2 }, on && s.dayOn]}>
                   <Text style={[s.dayNum, off && { color: 'rgba(244,243,236,0.22)' }, on && { color: colors.onAccent, fontWeight: '700' }]}>{c.label}</Text>
                 </View>
                 <View style={[s.dot, { backgroundColor: dot && !on ? dot : 'transparent' }]} />
@@ -250,7 +258,7 @@ export default function Agendar() {
           const off = unavailable(court, h);
           const on = hour === h;
           return (
-            <Pressable key={h} disabled={off} onPress={() => setHour(h)} style={[s.time, on && s.timeOn, off && s.timeOff]}>
+            <Pressable key={h} disabled={off} onPress={() => setHour(h)} style={[s.time, { width: timeW }, on && s.timeOn, off && s.timeOff]}>
               <Text style={[s.timeText, on && { color: colors.onAccent, fontWeight: '700' }, off && s.timeTextOff]}>
                 {pad2(h)}:00
               </Text>
@@ -346,7 +354,7 @@ const s = StyleSheet.create({
   dayNum: { color: colors.text, fontSize: 15 },
   dot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
   times: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  time: { width: '15.3%', minWidth: 52, paddingVertical: 11, borderRadius: radius.sm, alignItems: 'center', backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
+  time: { paddingVertical: 11, borderRadius: radius.sm, alignItems: 'center', backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   timeOn: { backgroundColor: colors.cream, borderColor: colors.cream },
   timeOff: { backgroundColor: 'rgba(244,243,236,0.03)', borderColor: 'transparent' },
   timeText: { fontSize: 13, fontWeight: '500' },

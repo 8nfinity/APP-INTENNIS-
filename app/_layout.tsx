@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import 'react-native-reanimated';
 
+import { AppFrame } from '@/components/AppFrame';
 import { Button, ErrorState } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import '@/lib/install'; // escuta cedo o aviso de instalação do navegador (webapp)
@@ -69,7 +70,9 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider value={theme}>
         <StatusBar style="light" />
-        <RootNav />
+        <AppFrame>
+          <RootNav />
+        </AppFrame>
       </ThemeProvider>
     </AuthProvider>
   );

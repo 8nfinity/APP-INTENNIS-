@@ -6,6 +6,7 @@ import { Avatar, Card, Empty, ErrorState, Loading, Muted, Screen, Section, StatT
 import { useFetch } from '@/lib/api';
 import { pad2 } from '@/lib/booking';
 import { toISO } from '@/lib/game';
+import { useLayout } from '@/lib/layout';
 import { colors, radius, space } from '@/lib/theme';
 import { TeacherClass } from '@/lib/types';
 
@@ -30,6 +31,8 @@ export default function Aulas() {
   const [cursor, setCursor] = useState(() => ({ y: new Date().getFullYear(), m: new Date().getMonth() }));
   const [date, setDate] = useState(today);
 
+  const { contentW } = useLayout();
+  const dayD = Math.max(28, Math.min(36, Math.floor((contentW - 34) / 7))); // diâmetro do dia
   const monthStart = toISO(new Date(cursor.y, cursor.m, 1));
   const daysInMonth = new Date(cursor.y, cursor.m + 1, 0).getDate();
   const monthQ = useFetch<Agenda>(`/teacher/agenda?from=${monthStart}&days=${daysInMonth}`);
@@ -101,7 +104,7 @@ export default function Aulas() {
             const on = iso === date;
             return (
               <Pressable key={iso} onPress={() => setDate(iso)} style={s.cell}>
-                <View style={[s.day, n > 0 && s.dayBusy, on && s.dayOn, iso === today && !on && s.dayToday]}>
+                <View style={[s.day, { width: dayD, height: dayD, borderRadius: dayD / 2 }, n > 0 && s.dayBusy, on && s.dayOn, iso === today && !on && s.dayToday]}>
                   <Text style={[s.dayNum, on && { color: colors.onAccent, fontWeight: '700' }]}>{parse(iso).getDate()}</Text>
                 </View>
                 <Text style={[s.count, { opacity: n ? 1 : 0 }]}>{n} aula{n === 1 ? '' : 's'}</Text>

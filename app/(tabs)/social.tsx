@@ -9,11 +9,13 @@ import { Avatar, Empty, ErrorState, Loading, Muted, RoundButton, Screen, Text } 
 import { useFetch } from '@/lib/api';
 import { useMe } from '@/lib/auth';
 import { avatarColor } from '@/lib/game';
+import { useLayout } from '@/lib/layout';
 import { colors, space } from '@/lib/theme';
 import { Post } from '@/lib/types';
 
 export default function Social() {
   const me = useMe();
+  const { insets } = useLayout();
   const { data, error, loading, reload } = useFetch<{ posts: Post[] }>('/posts');
   const [author, setAuthor] = useState<string | null>(null);
   const posts = data?.posts ?? [];
@@ -75,7 +77,7 @@ export default function Social() {
       </Screen>
 
       {/* botão flutuante de publicar, como os botões redondos da referência */}
-      <Pressable onPress={() => router.push('/new-post')} style={s.fab}>
+      <Pressable onPress={() => router.push('/new-post')} style={[s.fab, { right: 20 + insets.right }]}>
         <Ionicons name="camera" size={24} color={colors.onAccent} />
       </Pressable>
     </View>

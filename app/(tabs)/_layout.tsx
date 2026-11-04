@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { ColorValue, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/lib/auth';
+import { useLayout } from '@/lib/layout';
 import { FONT, colors } from '@/lib/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -17,14 +17,16 @@ const tab = (title: string, icon: IconName, iconOff: IconName) => ({
 
 export default function TabLayout() {
   const { player } = useAuth();
-  const insets = useSafeAreaInsets();
+  const { insets, compact } = useLayout();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.cream,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontFamily: FONT.medium, fontSize: 11 },
+        tabBarLabelStyle: { fontFamily: FONT.medium, fontSize: compact ? 10 : 11 },
+        // altura da barra é fixa: o nome da aba não cresce com a fonte grande do sistema
+        tabBarAllowFontScaling: false,
         // Barra fixa no rodapé com ícone + nome, como nas referências.
         tabBarStyle: {
           backgroundColor: colors.surface,
@@ -32,7 +34,16 @@ export default function TabLayout() {
           borderTopWidth: 1,
           // no navegador: altura fixa para o nome da aba não cortar, mais a faixa
           // inferior do iPhone quando o webapp abre em tela cheia
-          ...(Platform.OS === 'web' ? { height: 66 + insets.bottom, paddingTop: 6, paddingBottom: 10 + insets.bottom } : null),
+          ...(Platform.OS === 'web'
+            ? {
+                height: 66 + insets.bottom,
+                paddingTop: 6,
+                paddingBottom: 10 + insets.bottom,
+                // celular deitado: a barra não passa por baixo do recorte lateral
+                paddingLeft: insets.left,
+                paddingRight: insets.right,
+              }
+            : null),
         },
       }}>
       <Tabs.Screen name="index" options={tab('Agendar', 'calendar', 'calendar-outline')} />

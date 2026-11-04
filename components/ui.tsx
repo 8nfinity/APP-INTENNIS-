@@ -19,10 +19,10 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line } from 'react-native-svg';
 
 import { avatarColor } from '@/lib/game';
+import { useLayout } from '@/lib/layout';
 import { FONT, colors, radius, space, type } from '@/lib/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -32,7 +32,8 @@ export function Text({ style, ...props }: TextProps) {
   const flat = (StyleSheet.flatten(style) || {}) as TextStyle;
   const w = Number(flat.fontWeight === 'bold' ? 700 : (flat.fontWeight ?? 400));
   const family = w >= 900 ? FONT.black : w >= 800 ? FONT.extra : w >= 700 ? FONT.bold : w >= 500 ? FONT.medium : FONT.regular;
-  return <RNText {...props} style={[{ color: colors.text }, style, { fontFamily: family, fontWeight: undefined }]} />;
+  // limite no aumento da fonte do sistema: respeita acessibilidade sem quebrar o layout
+  return <RNText maxFontSizeMultiplier={1.25} {...props} style={[{ color: colors.text }, style, { fontFamily: family, fontWeight: undefined }]} />;
 }
 
 export function Screen({
@@ -48,14 +49,24 @@ export function Screen({
   padTop?: boolean;
   tab?: boolean;
 }) {
-  const insets = useSafeAreaInsets();
+  const { insets, padL, padR } = useLayout();
   return (
     <View style={s.screen}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[s.content, { paddingTop: padTop ? insets.top + 12 : space.lg, paddingBottom: tab ? 32 : 48 }]}
+          contentContainerStyle={[
+            s.content,
+            {
+              paddingLeft: padL,
+              paddingRight: padR,
+              // topo: área do notch/ilha dinâmica. Base: telas com abas já têm a barra; as demais
+              // precisam da faixa do indicador de início do iPhone / gestos do Android
+              paddingTop: padTop ? insets.top + 12 : space.lg,
+              paddingBottom: (tab ? 32 : 48) + (tab ? 0 : insets.bottom),
+            },
+          ]}
           refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.cream} /> : undefined}>
           {children}
         </ScrollView>
@@ -256,7 +267,7 @@ export function FormRow({ label, last, ...props }: TextInputProps & { label: str
   return (
     <View style={[s.row, !last && s.rowBorder, props.multiline && { alignItems: 'flex-start' }]}>
       <Text style={[s.formLabel, props.multiline && { paddingTop: 2 }]}>{label}</Text>
-      <TextInput placeholderTextColor={colors.muted} {...props} style={[s.formInput, props.editable === false && { color: colors.muted }]} />
+      <TextInput placeholderTextColor={colors.muted} maxFontSizeMultiplier={1.25} {...props} style={[s.formInput, props.editable === false && { color: colors.muted }]} />
     </View>
   );
 }
@@ -267,6 +278,7 @@ export function Field({ label, error, ...props }: TextInputProps & { label: stri
       <Text style={s.label}>{label}</Text>
       <TextInput
         placeholderTextColor={colors.muted}
+        maxFontSizeMultiplier={1.25}
         {...props}
         style={[s.input, error ? { borderColor: colors.danger } : null, props.multiline && { minHeight: 96, textAlignVertical: 'top' }]}
       />
@@ -380,7 +392,7 @@ export function formatBRL(n: number) {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: space.lg, gap: space.lg },
+  content: { gap: space.lg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
   headerTitle: { flex: 1, textAlign: 'center', color: colors.text, fontSize: 18, fontWeight: '700' },
   round: {
@@ -434,7 +446,8 @@ const s = StyleSheet.create({
   rowLabel: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '500' },
   rowValue: { color: colors.muted, fontSize: 14 },
   formLabel: { color: colors.muted, fontSize: 14, width: 96 },
-  formInput: { flex: 1, color: colors.text, fontSize: 15, textAlign: 'right', fontFamily: FONT.medium, paddingVertical: 0 },
+  // 16px: abaixo disso o Safari do iPhone dá zoom automático ao tocar no campo
+  formInput: { flex: 1, color: colors.text, fontSize: 16, textAlign: 'right', fontFamily: FONT.medium, paddingVertical: 0 },
   label: { color: colors.muted, fontWeight: '600', fontSize: 12, letterSpacing: 0.5, textTransform: 'uppercase' },
   input: {
     backgroundColor: colors.card,
