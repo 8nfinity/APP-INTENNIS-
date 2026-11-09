@@ -1,12 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Logo } from '@/components/Logo';
-import { Button, ErrorText, Field, H1, Muted, Screen } from '@/components/ui';
+import { AuthLayout } from '@/components/AuthLayout';
+import { Button, ErrorText, Eyebrow, Field, Headline, Sub } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { colors, space } from '@/lib/theme';
 
 export default function Forgot() {
   const { resetPassword } = useAuth();
@@ -30,33 +27,20 @@ export default function Forgot() {
   };
 
   return (
-    <Screen>
-      <Pressable onPress={() => router.back()} hitSlop={12}>
-        <Ionicons name="arrow-back" size={24} color={colors.text} />
-      </Pressable>
-      <Logo size={30} />
-      <View style={{ gap: space.xs }}>
-        <H1>Recuperar senha</H1>
-        <Muted>Enviaremos um link para você criar uma nova senha.</Muted>
+    <AuthLayout line="Tudo tem solução" heading="Vamos te colocar de volta.">
+      <View style={{ gap: 6 }}>
+        <Eyebrow>Recuperar senha</Eyebrow>
+        <Headline>Enviaremos um link para uma nova senha.</Headline>
       </View>
       {sent ? (
-        <Muted style={{ fontSize: 15, color: colors.text }}>
-          Se existir uma conta com esse e-mail, o link já está a caminho. Confira também o spam.
-        </Muted>
+        <Sub style={{ fontSize: 14, lineHeight: 20 }}>Se existir uma conta com esse e-mail, o link já está a caminho. Confira também o spam.</Sub>
       ) : (
         <>
-          <Field
-            label="E-mail"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="voce@email.com"
-          />
+          <Field label="E-mail" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="voce@exemplo.com" />
           <ErrorText>{error}</ErrorText>
-          <Button label="Enviar link" loading={busy} onPress={submit} />
+          <Button label="Enviar link" arrow loading={busy} onPress={submit} />
         </>
       )}
-    </Screen>
+    </AuthLayout>
   );
 }

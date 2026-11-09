@@ -5,6 +5,9 @@ import { Booking } from './types';
 
 export const pad2 = (n: number) => String(n).padStart(2, '0');
 
+// "Quadra 1" vira "Quadra 01" (como no protótipo); nomes personalizados ficam como estão
+export const courtLabel = (name: string, index: number) => (/^quadra\s*\d+$/i.test(name) ? `Quadra ${pad2(index + 1)}` : name);
+
 // Mesma regra do servidor: o check-in abre 1 hora antes e fecha no fim do horário reservado.
 export function checkinInfo(b: Booking, now = new Date()) {
   if (b.status === 'concluido') return { state: 'done' as const, label: 'Check-in feito ✓' };

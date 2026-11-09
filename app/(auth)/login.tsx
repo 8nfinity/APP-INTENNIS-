@@ -1,10 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Logo } from '@/components/Logo';
-import { Button, ErrorText, Field, H1, Muted, Screen, Text } from '@/components/ui';
+import { AuthLayout } from '@/components/AuthLayout';
+import { Button, ErrorText, Eyebrow, Field, Headline, Text } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { colors, space } from '@/lib/theme';
 
@@ -29,45 +28,25 @@ export default function Login() {
   };
 
   return (
-    <Screen>
-      <Pressable onPress={() => router.back()} hitSlop={12}>
-        <Ionicons name="arrow-back" size={24} color={colors.text} />
-      </Pressable>
-      <Logo size={30} />
-      <View style={{ gap: space.xs }}>
-        <H1>Bem-vindo de volta</H1>
-        <Muted>Entre para reservar sua quadra e ver o ranking.</Muted>
+    <AuthLayout line="Que bom te ver de novo" heading="Sua quadra te espera.">
+      <View style={{ gap: 6 }}>
+        <Eyebrow>Bem-vindo de volta</Eyebrow>
+        <Headline>Seu próximo jogo começa aqui.</Headline>
       </View>
-      <Field
-        label="E-mail"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-        textContentType="emailAddress"
-        placeholder="voce@email.com"
-      />
-      <Field
-        label="Senha"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoComplete="current-password"
-        textContentType="password"
-        placeholder="Sua senha"
-        onSubmitEditing={submit}
-      />
+      <Field label="E-mail" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" placeholder="voce@exemplo.com" />
+      <Field label="Senha" value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" textContentType="password" placeholder="Sua senha" onSubmitEditing={submit} />
       <ErrorText>{error}</ErrorText>
       <Button label="Entrar" arrow loading={busy} onPress={submit} />
-      <Link href="/forgot" style={{ alignSelf: 'center' }}>
-        <Text style={{ color: colors.muted }}>Esqueci minha senha</Text>
-      </Link>
-      <Link href="/signup" style={{ alignSelf: 'center' }}>
-        <Text style={{ color: colors.muted }}>
-          Não tem conta? <Text style={{ color: colors.accent, fontWeight: '800' }}>Criar agora</Text>
-        </Text>
-      </Link>
-    </Screen>
+      <View style={{ gap: space.md, alignItems: 'center' }}>
+        <Link href="/forgot">
+          <Text style={{ fontSize: 12.5, color: colors.muted }}>Esqueci minha senha</Text>
+        </Link>
+        <Link href="/signup">
+          <Text style={{ fontSize: 12.5, color: colors.muted }}>
+            Não tem conta? <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.forest2 }}>Criar agora</Text>
+          </Text>
+        </Link>
+      </View>
+    </AuthLayout>
   );
 }

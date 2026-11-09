@@ -24,12 +24,12 @@ export function AppFrame({ children }: { children: ReactNode }) {
 }
 
 const s = StyleSheet.create({
-  outer: { flex: 1, alignItems: 'center', backgroundColor: '#050706' },
+  outer: { flex: 1, alignItems: 'center', backgroundColor: '#E4E8DA' },
   inner: {
     flex: 1,
     width: '100%',
     maxWidth: MAX_FRAME,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.paper,
     // só aparece quando sobra espaço dos lados
     borderLeftWidth: StyleSheet.hairlineWidth,
     borderRightWidth: StyleSheet.hairlineWidth,

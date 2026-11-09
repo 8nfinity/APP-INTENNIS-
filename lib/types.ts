@@ -88,4 +88,6 @@ export type GameEvent = {
   category: 'torneio' | 'jogo' | 'aula' | 'novidade';
   date: string; // yyyy-mm-dd
   place: string;
+  interestCount: number;
+  interestedByMe: boolean;
 };

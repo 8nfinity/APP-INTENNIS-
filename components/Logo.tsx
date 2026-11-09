@@ -1,10 +1,11 @@
 import { Image } from 'react-native';
 
-// Logo oficial do In Tennis Club (creme, fundo transparente) para usar sobre o verde da marca.
-const LOGO = require('../assets/images/logo.png');
-const RATIO = 491 / 372; // largura / altura do arquivo
+// Logo oficial do In Tennis Club (creme, fundo transparente), para usar sobre o verde da marca.
+// 'mark' = só o "IN."; 'full' = "IN." com "TENNIS CLUB".
+const MARK = require('../assets/images/logo-mark.png');
+const FULL = require('../assets/images/logo.png');
+const RATIO = { mark: 521 / 331, full: 720 / 545 };
 
-export function Logo({ size = 40 }: { size?: number }) {
-  // `size` é a altura do logo
-  return <Image source={LOGO} style={{ height: size * 1.9, width: size * 1.9 * RATIO }} resizeMode="contain" />;
+export function Logo({ variant = 'mark', height = 32 }: { variant?: 'mark' | 'full'; height?: number }) {
+  return <Image source={variant === 'mark' ? MARK : FULL} style={{ height, width: height * RATIO[variant] }} resizeMode="contain" />;
 }

@@ -145,6 +145,15 @@ alter table bookings add column if not exists teacher_price numeric(10,2); -- va
 create unique index if not exists bookings_teacher_slot
   on bookings (teacher_id, date, hour) where teacher_id is not null and status in ('pendente','pago','concluido');
 
+-- ---------- v5: interesse em eventos ----------
+create table if not exists event_interests (
+  event_id uuid not null references events(id) on delete cascade,
+  player_id uuid not null references players(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (event_id, player_id)
+);
+alter table event_interests enable row level security;
+
 -- Segurança: com RLS ligado e nenhuma policy, a chave pública do Supabase não
 -- lê nem escreve nestas tabelas. Só o servidor (conexão direta, DATABASE_URL)
 -- acessa, e ele valida o login e as permissões de cada pedido.

@@ -271,6 +271,24 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     const price = court.price + (teacher ? teacher.price : 0); // o preço vem SEMPRE do servidor
 
     await expirePending();
+
+    // Se esta pessoa já está segurando este horário (voltou para a tela de pagamento),
+    // reaproveita a reserva em vez de dar erro de "horário ocupado".
+    const mine = (await pool.query(
+      `select id, kind, teacher_id, court_id as "courtId", to_char(date,'YYYY-MM-DD') as date, hour, price::float as price, status,
+              greatest(0, extract(epoch from (created_at + ($5 || ' minutes')::interval - now())))::int as "holdSeconds"
+       from bookings where player_id = $1 and court_id = $2 and date = $3 and hour = $4 and status = 'pendente'`,
+      [p.id, courtId, date, hour, PENDING_MINUTES],
+    )).rows[0];
+    if (mine) {
+      if (mine.kind === kind && (mine.teacher_id ?? null) === (teacher?.id ?? null)) {
+        const { id, courtId: cid, date: d, hour: h, kind: k, price: pr, status, holdSeconds } = mine;
+        return res.json({ booking: { id, courtId: cid, date: d, hour: h, kind: k, price: pr, status }, holdMinutes: PENDING_MINUTES, holdSeconds });
+      }
+      // mudou de jogo livre para aula (ou de professor): cancela a antiga e cria a nova
+      await pool.query("update bookings set status = 'cancelado' where id = $1", [mine.id]);
+    }
+
     try {
       const { rows } = await pool.query(
         `insert into bookings (player_id, court_id, date, hour, kind, price, teacher_id, teacher_price)
@@ -278,7 +296,7 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
          returning id, court_id as "courtId", to_char(date,'YYYY-MM-DD') as date, hour, kind, price::float as price, status`,
         [p.id, courtId, date, hour, kind, price, teacher?.id ?? null, teacher?.price ?? null],
       );
-      res.status(201).json({ booking: rows[0], holdMinutes: PENDING_MINUTES });
+      res.status(201).json({ booking: rows[0], holdMinutes: PENDING_MINUTES, holdSeconds: PENDING_MINUTES * 60 });
     } catch (e) {
       if (e.code === '23505' && e.constraint === 'bookings_teacher_slot') {
         throw new HttpError(409, 'Esse professor já tem aula nesse horário. Escolha outro horário ou professor.');
@@ -430,12 +448,29 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
 
   // ---------- eventos ----------
   r.get('/events', wrap(async (req, res) => {
-    await needMe(req);
+    const p = await needMe(req);
     const { rows } = await pool.query(
-      `select id, title, description, category, to_char(date,'YYYY-MM-DD') as date, place
-       from events where date >= current_date - 1 order by date asc limit 100`,
+      `select e.id, e.title, e.description, e.category, to_char(e.date,'YYYY-MM-DD') as date, e.place,
+              (select count(*) from event_interests i where i.event_id = e.id)::int as "interestCount",
+              exists(select 1 from event_interests i where i.event_id = e.id and i.player_id = $1) as "interestedByMe"
+       from events e where e.date >= current_date - 1 order by e.date asc limit 100`,
+      [p.id],
     );
     res.json({ events: rows });
+  }));
+
+  // "Tenho interesse" no evento: liga e desliga. O clube vê a lista de interessados.
+  r.post('/events/:id/interest', wrap(async (req, res) => {
+    const p = await needMe(req);
+    if (!UUID.test(req.params.id)) throw bad('Evento inválido');
+    const ev = await pool.query('select 1 from events where id = $1', [req.params.id]);
+    if (!ev.rowCount) throw new HttpError(404, 'Evento não encontrado');
+    const del = await pool.query('delete from event_interests where event_id = $1 and player_id = $2', [req.params.id, p.id]);
+    if (!del.rowCount) {
+      await pool.query('insert into event_interests (event_id, player_id) values ($1,$2) on conflict do nothing', [req.params.id, p.id]);
+    }
+    const count = (await pool.query('select count(*)::int as n from event_interests where event_id = $1', [req.params.id])).rows[0].n;
+    res.json({ interestedByMe: !del.rowCount, interestCount: count });
   }));
 
   r.post('/events', wrap(async (req, res) => {

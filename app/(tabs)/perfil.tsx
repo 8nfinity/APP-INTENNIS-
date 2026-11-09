@@ -1,14 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { PostCard } from '@/components/PostCard';
-import { Avatar, Button, Card, Empty, Loading, Muted, ProgressBar, RoundButton, Screen, Segmented, StatTile, Text } from '@/components/ui';
+import { Avatar, Button, Card, Empty, Eyebrow, Loading, RoundButton, Screen, Segmented, StatBox, Sub, Tag, Text } from '@/components/ui';
 import { useFetch } from '@/lib/api';
 import { useAuth, useMe } from '@/lib/auth';
-import { checkinInfo, doCheckIn, pad2 } from '@/lib/booking';
-import { fmtDate, levelFor, toISO } from '@/lib/game';
+import { checkinInfo, courtLabel, pad2 } from '@/lib/booking';
+import { parseISO, MONTHS_SHORT } from '@/lib/dates';
+import { levelFor } from '@/lib/game';
 import { colors, space } from '@/lib/theme';
 import { Booking, Court, Player, Post } from '@/lib/types';
 
@@ -27,11 +28,9 @@ export default function Perfil() {
   const rank = (rankQ.data?.players ?? []).findIndex((p) => p.id === me.id) + 1;
   const games = me.wins + me.losses;
   const winRate = games ? Math.round((me.wins / games) * 100) : 0;
-  const today = toISO(new Date());
+  const courts = courtsQ.data?.courts ?? [];
   const key = (b: Booking) => b.date + pad2(b.hour);
-  const upcoming = (bookingsQ.data?.bookings ?? []).filter((b) => b.status === 'pago' && b.date >= today).sort((a, b) => key(a).localeCompare(key(b)));
-  const done = (bookingsQ.data?.bookings ?? []).filter((b) => b.status === 'concluido');
-  const courtName = (id: string) => courtsQ.data?.courts.find((c) => c.id === id)?.name ?? '';
+  const bookings = (bookingsQ.data?.bookings ?? []).filter((b) => b.status === 'pago' || b.status === 'concluido').sort((a, b) => key(b).localeCompare(key(a)));
 
   const badges = [
     { icon: '🎾', label: 'Primeiro jogo', on: games >= 1 },
@@ -49,46 +48,38 @@ export default function Perfil() {
     bookingsQ.reload();
   };
 
-  const checkIn = async (id: string) => {
-    if (await doCheckIn(id)) reload();
-  };
-
   return (
     <Screen tab refreshing={false} onRefresh={reload}>
-      <View style={s.head}>
-        <Text style={s.title}>Meu perfil</Text>
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <RoundButton icon="flame-outline" label={String(me.streak)} onPress={() => setTab('conquistas')} />
-          <RoundButton icon="settings-outline" onPress={() => router.push('/settings')} />
-        </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Eyebrow>Seu espaço no clube</Eyebrow>
+        <RoundButton icon="settings-outline" label="Configurações" onLight onPress={() => router.push('/settings')} />
       </View>
 
-      <View style={s.center}>
-        <Pressable onPress={() => router.push('/edit-profile')}>
-          <Avatar name={me.name} url={me.avatarUrl} size={108} />
-        </Pressable>
-        <View style={s.nameRow}>
-          <Text style={s.name}>{me.name}</Text>
-          <Ionicons name={me.isAdmin ? 'shield-checkmark' : 'checkmark-circle'} size={20} color={me.isAdmin ? colors.cream : lvl.current.color} />
+      <LinearGradient colors={['#E5ECD2', '#EFF3E4']} style={s.panel}>
+        <Avatar name={me.name} url={me.avatarUrl} size={84} ring="#fff" />
+        <Text style={{ fontSize: 28, letterSpacing: -0.9, marginTop: 12 }}>{me.name}</Text>
+        <Sub style={{ fontSize: 12 }}>@{me.username}</Sub>
+        {!!me.bio && <Text style={{ fontSize: 13, color: '#4A5A4F', textAlign: 'center', marginTop: 4 }}>{me.bio}</Text>}
+        <View style={s.pill}>
+          <Text style={{ fontSize: 11.5, fontWeight: '500', color: colors.onLime }}>
+            {rank ? `#${rank} no ranking` : 'Sem posição'} · {me.points} pts
+          </Text>
         </View>
-        <Muted style={{ fontSize: 14 }}>
-          {rank ? `#${rank} no ranking` : 'Sem posição'} · {me.points} pts · {lvl.current.name}
-        </Muted>
-        {!!me.bio && <Text style={s.bio}>{me.bio}</Text>}
+      </LinearGradient>
+
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <StatBox value={String(games)} label="Jogos" />
+        <StatBox value={String(me.wins)} label="Vitórias" />
+        <StatBox value={`${winRate}%`} label="Aproveitamento" />
       </View>
 
-      <View style={s.stats}>
-        <StatTile value={rank ? `#${rank}` : '-'} label="Ranking" accent />
-        <StatTile value={String(games)} label="Jogos" />
-        <StatTile value={String(me.wins)} label="Vitórias" />
-        <StatTile value={`${winRate}%`} label="Aproveit." />
-      </View>
+      <Button label="Editar perfil" variant="ghost" onPress={() => router.push('/edit-profile')} />
 
       <Segmented<Tab>
         options={[
-          { key: 'posts', label: 'Publicações', icon: 'images-outline' },
-          { key: 'reservas', label: 'Reservas', icon: 'calendar-outline' },
-          { key: 'conquistas', label: 'Conquistas', icon: 'trophy-outline' },
+          { key: 'posts', label: 'Publicações' },
+          { key: 'reservas', label: 'Reservas' },
+          { key: 'conquistas', label: 'Conquistas' },
         ]}
         value={tab}
         onChange={setTab}
@@ -99,75 +90,69 @@ export default function Perfil() {
           {postsQ.loading && <Loading />}
           {postsQ.data && postsQ.data.posts.length === 0 && (
             <>
-              <Empty icon="images-outline" title="Nenhuma publicação" hint="Mostre seus jogos e melhores momentos." />
+              <Empty icon="chatbubble-outline" title="Nenhuma publicação" hint="Mostre seus jogos e melhores momentos." />
               <Button label="Fazer a primeira publicação" variant="ghost" onPress={() => router.push('/new-post')} />
             </>
           )}
           {postsQ.data?.posts.map((p) => (
-            <PostCard key={p.id} post={p} variant="profile" canDelete onChanged={postsQ.reload} />
+            <PostCard key={p.id} post={p} canDelete onChanged={postsQ.reload} />
           ))}
         </View>
       )}
 
       {tab === 'reservas' && (
         <View style={{ gap: space.md }}>
-          {upcoming.length === 0 && (
+          {bookings.length === 0 && (
             <>
-              <Empty icon="calendar-outline" title="Nenhuma reserva marcada" />
+              <Empty icon="calendar-outline" title="Nenhuma reserva ainda" />
               <Button label="Reservar quadra" onPress={() => router.push('/')} />
             </>
           )}
-          {upcoming.map((b) => {
+          {bookings.map((b) => {
+            const d = parseISO(b.date);
+            const court = courts.find((c) => c.id === b.courtId);
             const ci = checkinInfo(b);
             return (
-              <Card key={b.id} style={{ gap: space.md }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-                  <View style={s.dateBox}>
-                    <Text style={s.dateBoxDay}>{b.date.slice(8)}</Text>
-                    <Text style={s.dateBoxMon}>{fmtDate(b.date).slice(3, 5)}/{b.date.slice(2, 4)}</Text>
+              <Pressable key={b.id} onPress={() => router.push({ pathname: '/booking/[id]', params: { id: b.id } })}>
+                <Card style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: 12 }}>
+                  <View style={s.date}>
+                    <Text style={{ fontSize: 9.5, color: colors.muted }}>{MONTHS_SHORT[d.getMonth()]}</Text>
+                    <Text style={{ fontSize: 20, fontWeight: '500', lineHeight: 22 }}>{d.getDate()}</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontWeight: '700', fontSize: 16 }}>
-                      {b.date === today ? 'Hoje' : fmtDate(b.date)} · {pad2(b.hour)}:00
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '500' }}>
+                      {court ? courtLabel(court.name, courts.indexOf(court)) : 'Quadra'} · {pad2(b.hour)}:00
                     </Text>
-                    <Muted>
-                      {b.kind === 'aula' ? `Aula${b.teacherName ? ` com ${b.teacherName}` : ''}` : 'Jogo'} · {courtName(b.courtId)}
-                    </Muted>
+                    <Sub style={{ fontSize: 11.5 }}>{b.kind === 'aula' ? `Aula${b.teacherName ? ` com ${b.teacherName}` : ''}` : 'Jogo livre'}</Sub>
                   </View>
-                </View>
-                {ci.state === 'open' ? (
-                  <Button label="Fazer check-in" arrow onPress={() => checkIn(b.id)} />
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="time-outline" size={15} color={colors.muted} />
-                    <Muted>{ci.label}</Muted>
-                  </View>
-                )}
-              </Card>
+                  <Tag label={ci.state === 'open' ? 'Check-in' : b.status === 'concluido' ? 'Concluída' : 'Confirmada'} tone={ci.state === 'open' ? 'lime' : 'sage'} />
+                </Card>
+              </Pressable>
             );
           })}
-          {done.length > 0 && <Muted>{done.length} check-in{done.length > 1 ? 's' : ''} feito{done.length > 1 ? 's' : ''} até agora.</Muted>}
         </View>
       )}
 
       {tab === 'conquistas' && (
         <View style={{ gap: space.md }}>
-          <Card style={{ gap: space.sm }}>
+          <Card style={{ gap: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontWeight: '700', fontSize: 16, color: lvl.current.color }}>{lvl.current.name}</Text>
-              <Muted>{lvl.next ? `${lvl.toNext} pts para ${lvl.next.name}` : 'Nível máximo'}</Muted>
+              <Text style={{ fontSize: 16, fontWeight: '500', color: lvl.current.color }}>{lvl.current.name}</Text>
+              <Sub style={{ fontSize: 11.5 }}>{lvl.next ? `${lvl.toNext} pts para ${lvl.next.name}` : 'Nível máximo'}</Sub>
             </View>
-            <ProgressBar value={lvl.progress} color={colors.lime} />
-            <Muted>
-              Sequência atual: {me.streak} vitória{me.streak === 1 ? '' : 's'} seguida{me.streak === 1 ? '' : 's'} · {me.classes} aula{me.classes === 1 ? '' : 's'}
-            </Muted>
+            <View style={s.track}>
+              <View style={[s.fill, { width: `${Math.max(3, lvl.progress * 100)}%` }]} />
+            </View>
+            <Sub style={{ fontSize: 11.5 }}>
+              Sequência: {me.streak} vitória{me.streak === 1 ? '' : 's'} seguida{me.streak === 1 ? '' : 's'} · {me.classes} aula{me.classes === 1 ? '' : 's'}
+            </Sub>
           </Card>
-          <View style={s.badges}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
             {badges.map((b) => (
-              <Card key={b.label} style={[s.badge, !b.on && { opacity: 0.3 }]}>
-                <Text style={{ fontSize: 28 }}>{b.icon}</Text>
-                <Text style={s.badgeText}>{b.label}</Text>
-              </Card>
+              <View key={b.label} style={[s.badge, !b.on && { opacity: 0.35 }]}>
+                <Text style={{ fontSize: 24 }}>{b.icon}</Text>
+                <Text style={{ fontSize: 10.5, textAlign: 'center', fontWeight: '500' }}>{b.label}</Text>
+              </View>
             ))}
           </View>
         </View>
@@ -177,17 +162,10 @@ export default function Perfil() {
 }
 
 const s = StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 26, fontWeight: '700' },
-  center: { alignItems: 'center', gap: 6 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  name: { fontSize: 24, fontWeight: '700' },
-  bio: { textAlign: 'center', color: colors.text, opacity: 0.85 },
-  stats: { flexDirection: 'row', gap: space.sm },
-  dateBox: { width: 52, height: 52, borderRadius: 14, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
-  dateBoxDay: { color: colors.onAccent, fontSize: 20, fontWeight: '800', lineHeight: 22 },
-  dateBoxMon: { color: colors.onAccent, fontSize: 10, fontWeight: '600' },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  badge: { width: '31%', alignItems: 'center', padding: space.md, gap: 4 },
-  badgeText: { color: colors.text, fontSize: 11, textAlign: 'center', fontWeight: '600' },
+  panel: { borderRadius: 30, paddingVertical: 24, paddingHorizontal: 20, alignItems: 'center', borderWidth: 1, borderColor: '#DCE5C4' },
+  pill: { marginTop: 14, backgroundColor: colors.lime, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
+  date: { width: 46, height: 50, borderRadius: 12, backgroundColor: colors.field, alignItems: 'center', justifyContent: 'center' },
+  track: { height: 6, borderRadius: 3, backgroundColor: colors.sage, overflow: 'hidden' },
+  fill: { height: '100%', backgroundColor: '#B6D25A', borderRadius: 3 },
+  badge: { width: '31%', alignItems: 'center', gap: 4, padding: 12, borderRadius: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
 });

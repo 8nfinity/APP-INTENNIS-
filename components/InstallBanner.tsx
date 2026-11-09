@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
-import { Muted, Text } from '@/components/ui';
+import { Sub, Text } from '@/components/ui';
 import { installApp, useInstall } from '@/lib/install';
 import { colors, radius, space } from '@/lib/theme';
 
@@ -36,22 +36,21 @@ export function InstallBanner() {
     <View style={s.box}>
       <Image source={ICON} style={s.icon} />
       <View style={{ flex: 1 }}>
-        <Text style={{ fontWeight: '700' }}>Instale o In Tennis</Text>
-        <Muted style={{ fontSize: 12 }}>Ícone na tela inicial e abre em tela cheia.</Muted>
+        <Text style={{ fontWeight: '500', fontSize: 13.5 }}>Instale o In Tennis</Text>
+        <Sub style={{ fontSize: 11.5, lineHeight: 15 }}>Ícone na tela inicial e abre em tela cheia.</Sub>
       </View>
       <Pressable onPress={installApp} style={s.btn}>
-        <Text style={s.btnText}>Instalar</Text>
+        <Text style={{ color: colors.onLime, fontWeight: '700', fontSize: 12.5 }}>Instalar</Text>
       </Pressable>
       <Pressable onPress={close} hitSlop={10}>
-        <Ionicons name="close" size={18} color={colors.muted} />
+        <Ionicons name="close" size={17} color={colors.forestMuted} />
       </Pressable>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  box: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: 'rgba(244,243,236,0.18)' },
-  icon: { width: 42, height: 42, borderRadius: 10 },
-  btn: { backgroundColor: colors.cream, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  btnText: { color: colors.onAccent, fontWeight: '700', fontSize: 13 },
+  box: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, backgroundColor: 'rgba(255,255,255,0.09)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
+  icon: { width: 40, height: 40, borderRadius: 10 },
+  btn: { backgroundColor: colors.lime, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
 });

@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { Avatar, Button, Card, Empty, ErrorText, Field, Loading, Muted, Screen, Text } from '@/components/ui';
+import { Avatar, Button, Empty, ErrorText, Eyebrow, Field, Headline, Loading, Screen, Sub, Text } from '@/components/ui';
 import { api, errMsg, useFetch } from '@/lib/api';
 import { timeAgo } from '@/lib/game';
 import { colors, space } from '@/lib/theme';
@@ -31,19 +31,23 @@ export default function Comments() {
   };
 
   return (
-    <Screen padTop={false}>
+    <Screen>
+      <View style={{ gap: 8 }}>
+        <Eyebrow>Conversa</Eyebrow>
+        <Headline>O que a galera disse.</Headline>
+      </View>
       {loading && <Loading />}
-      {data && data.comments.length === 0 && <Empty title="Sem comentários" hint="Comece a conversa." />}
+      {data && data.comments.length === 0 && <Empty icon="chatbubble-outline" title="Sem comentários" hint="Comece a conversa." />}
       {data?.comments.map((c) => (
-        <Card key={c.id} style={{ flexDirection: 'row', gap: space.md }}>
-          <Avatar name={c.authorName} url={c.authorAvatarUrl} size={38} />
+        <View key={c.id} style={{ flexDirection: 'row', gap: space.md, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <Avatar name={c.authorName} url={c.authorAvatarUrl} size={34} />
           <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.text, fontWeight: '800' }}>
-              {c.authorName} <Muted>· {timeAgo(c.createdAt)}</Muted>
+            <Text style={{ fontSize: 13, fontWeight: '500' }}>
+              {c.authorName} <Sub style={{ fontSize: 11 }}>· {timeAgo(c.createdAt)}</Sub>
             </Text>
-            <Text style={{ color: colors.text, marginTop: 2 }}>{c.text}</Text>
+            <Text style={{ fontSize: 13, color: '#3B4A41', marginTop: 2 }}>{c.text}</Text>
           </View>
-        </Card>
+        </View>
       ))}
       <Field label="Seu comentário" value={text} onChangeText={setText} maxLength={500} placeholder="Escreva algo legal..." />
       <ErrorText>{error}</ErrorText>

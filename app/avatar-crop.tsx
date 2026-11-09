@@ -5,7 +5,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Image, PanResponder, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { Button, ErrorText, Header, Muted, Screen, Text } from '@/components/ui';
+import { Button, ErrorText, Eyebrow, Headline, Screen, Sub, Text } from '@/components/ui';
 import { api, errMsg } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { uploadAsset } from '@/lib/media';
@@ -112,8 +112,8 @@ export default function AvatarCrop() {
   if (!img) {
     return (
       <Screen>
-        <Header title="Ajustar foto" />
-        <Muted>Nenhuma foto selecionada. Volte e escolha uma foto.</Muted>
+        <Headline>Ajustar foto</Headline>
+        <Sub>Nenhuma foto selecionada. Volte e escolha uma foto.</Sub>
       </Screen>
     );
   }
@@ -126,8 +126,11 @@ export default function AvatarCrop() {
 
   return (
     <Screen>
-      <Header title="Ajustar foto" />
-      <Muted style={{ textAlign: 'center' }}>Arraste para posicionar e use o zoom para enquadrar.</Muted>
+      <View style={{ gap: 8 }}>
+        <Eyebrow>Sua foto</Eyebrow>
+        <Headline>Ajuste o enquadramento.</Headline>
+        <Sub>Arraste para posicionar e use o zoom para enquadrar.</Sub>
+      </View>
 
       <View style={[s.stage, { width: S, height: S }]} {...drag.panHandlers}>
         <Image
@@ -135,37 +138,37 @@ export default function AvatarCrop() {
           style={{ position: 'absolute', width: dW, height: dH, left: S / 2 - dW / 2 + off.x, top: S / 2 - dH / 2 + off.y }}
         />
         <Svg width={S} height={S} style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Path d={hole} fill="rgba(10,13,11,0.75)" fillRule="evenodd" />
-          <Circle cx={S / 2} cy={S / 2} r={r} stroke={colors.cream} strokeWidth={2} fill="none" />
+          <Path d={hole} fill="rgba(244,245,238,0.8)" fillRule="evenodd" />
+          <Circle cx={S / 2} cy={S / 2} r={r} stroke={colors.forest} strokeWidth={2} fill="none" />
         </Svg>
       </View>
 
       <View style={s.zoomRow}>
         <Pressable onPress={() => step(-0.25)} hitSlop={8}>
-          <Ionicons name="remove-circle-outline" size={28} color={colors.text} />
+          <Ionicons name="remove-circle-outline" size={28} color={colors.ink} />
         </Pressable>
         <View style={[s.track, { width: TRACK }]} {...slider.panHandlers}>
-          <View style={[s.trackFill, { width: TRACK, backgroundColor: 'rgba(244,243,236,0.18)' }]} />
+          <View style={[s.trackFill, { width: TRACK, backgroundColor: colors.sage }]} />
           <View style={[s.trackFill, { width: ((zoom - 1) / (MAX_ZOOM - 1)) * TRACK }]} />
           <View style={[s.thumb, { left: ((zoom - 1) / (MAX_ZOOM - 1)) * TRACK - 12 }]} />
         </View>
         <Pressable onPress={() => step(0.25)} hitSlop={8}>
-          <Ionicons name="add-circle-outline" size={28} color={colors.text} />
+          <Ionicons name="add-circle-outline" size={28} color={colors.ink} />
         </Pressable>
       </View>
       <Text style={{ textAlign: 'center', color: colors.muted, fontSize: 12 }}>Zoom {zoom.toFixed(1)}x</Text>
 
       <ErrorText>{error}</ErrorText>
       <Button label="Salvar foto" loading={busy} onPress={save} style={{ borderRadius: 999 }} />
-      <Button label="Cancelar" variant="dark" onPress={() => router.back()} style={{ borderRadius: 999 }} />
+      <Button label="Cancelar" variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  stage: { alignSelf: 'center', overflow: 'hidden', borderRadius: 20, backgroundColor: colors.card, marginVertical: space.sm },
+  stage: { alignSelf: 'center', overflow: 'hidden', borderRadius: 20, backgroundColor: colors.sage, marginVertical: space.sm },
   zoomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.md },
   track: { height: 28, justifyContent: 'center' },
-  trackFill: { position: 'absolute', left: 0, height: 4, borderRadius: 2, backgroundColor: colors.cream },
-  thumb: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: colors.cream, borderWidth: 3, borderColor: colors.bg },
+  trackFill: { position: 'absolute', left: 0, height: 4, borderRadius: 2, backgroundColor: colors.forest2 },
+  thumb: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: colors.lime, borderWidth: 3, borderColor: colors.forest2 },
 });

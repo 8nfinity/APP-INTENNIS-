@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { Logo } from '@/components/Logo';
-import { Button, ErrorText, Field, H1, Muted, Screen } from '@/components/ui';
+import { AuthLayout } from '@/components/AuthLayout';
+import { Button, ErrorText, Eyebrow, Field, Headline } from '@/components/ui';
 import { api, errMsg } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { space } from '@/lib/theme';
 
 export default function CreateProfile() {
-  const { refreshPlayer, signOut } = useAuth();
-  const [name, setName] = useState('');
+  const { refreshPlayer, signOut, session } = useAuth();
+  // o nome digitado no cadastro vem junto da conta
+  const metaName = typeof session?.user.user_metadata?.name === 'string' ? (session.user.user_metadata.name as string) : '';
+  const [name, setName] = useState(metaName);
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -33,25 +34,17 @@ export default function CreateProfile() {
   };
 
   return (
-    <Screen>
-      <Logo size={30} />
-      <View style={{ gap: space.xs }}>
-        <H1>Monte seu perfil</H1>
-        <Muted>É assim que a galera vai te ver no ranking e no feed.</Muted>
+    <AuthLayout line="Falta pouco" heading="Como a galera vai te ver?" back={false}>
+      <View style={{ gap: 6 }}>
+        <Eyebrow>Seu perfil</Eyebrow>
+        <Headline>Faça do seu jeito.</Headline>
       </View>
       <Field label="Nome" value={name} onChangeText={setName} placeholder="Como você se chama" maxLength={60} />
-      <Field
-        label="Usuário"
-        value={username}
-        onChangeText={(t) => setUsername(t.toLowerCase())}
-        autoCapitalize="none"
-        placeholder="ex: joao.silva"
-        maxLength={20}
-      />
+      <Field label="@usuário" value={username} onChangeText={(t) => setUsername(t.toLowerCase())} autoCapitalize="none" placeholder="ex: joao.silva" maxLength={20} />
       <Field label="Bio (opcional)" value={bio} onChangeText={setBio} multiline maxLength={160} placeholder="Seu estilo de jogo, sua história..." />
       <ErrorText>{error}</ErrorText>
       <Button label="Entrar no clube" arrow loading={busy} onPress={submit} />
       <Button label="Sair da conta" variant="ghost" onPress={signOut} />
-    </Screen>
+    </AuthLayout>
   );
 }

@@ -2,10 +2,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { Button, Card, Chip, ErrorText, Field, Muted, Screen, Title } from '@/components/ui';
+import { Button, Card, ErrorText, Eyebrow, Field, Headline, InfoBox, Screen, Segmented, Sub, Text } from '@/components/ui';
 import { api, errMsg } from '@/lib/api';
 import { notify } from '@/lib/dialog';
-import { colors, space } from '@/lib/theme';
 
 export default function MatchResult() {
   const { matchId, name } = useLocalSearchParams<{ matchId: string; name: string }>();
@@ -28,21 +27,20 @@ export default function MatchResult() {
   };
 
   return (
-    <Screen padTop={false}>
-      <Card>
-        <Muted>Seu jogo contra</Muted>
-        <Title style={{ fontSize: 24 }}>{name}</Title>
-      </Card>
-      <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <Chip label="Venci" active={result === 'vitoria'} onPress={() => setResult('vitoria')} />
-        <Chip label="Perdi" active={result === 'derrota'} onPress={() => setResult('derrota')} />
+    <Screen>
+      <View style={{ gap: 8 }}>
+        <Eyebrow>Fim de papo</Eyebrow>
+        <Headline>Como foi o jogo?</Headline>
       </View>
+      <Card>
+        <Sub>Seu jogo contra</Sub>
+        <Text style={{ fontSize: 22, letterSpacing: -0.4, marginTop: 2 }}>{name}</Text>
+      </Card>
+      <Segmented options={[{ key: 'vitoria', label: 'Venci' }, { key: 'derrota', label: 'Perdi' }]} value={result} onChange={setResult} />
       <Field label="Placar" value={score} onChangeText={setScore} placeholder="ex: 6-4 3-6 7-5" maxLength={40} />
-      <Muted style={{ color: colors.muted }}>
-        Os pontos só entram depois que o adversário confirmar o resultado. Isso evita placares inventados.
-      </Muted>
+      <InfoBox>Os pontos só entram depois que o adversário confirmar o resultado. Isso evita placares inventados.</InfoBox>
       <ErrorText>{error}</ErrorText>
-      <Button label="Enviar resultado" loading={busy} onPress={save} />
+      <Button label="Enviar resultado" arrow loading={busy} onPress={save} />
     </Screen>
   );
 }

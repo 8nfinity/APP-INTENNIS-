@@ -1,15 +1,14 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, View } from 'react-native';
 
-import { Avatar, Header, ListGroup, ListRow, Muted, Screen, Text } from '@/components/ui';
+import { Card, Eyebrow, Headline, ListRow, Screen, Sub, Tag, Text } from '@/components/ui';
 import { useAuth, useMe } from '@/lib/auth';
-import { notify } from '@/lib/dialog';
+import { confirmAsk, notify } from '@/lib/dialog';
 import { POINTS, TOURNAMENT_SPOTS } from '@/lib/game';
 import { installApp, useInstall } from '@/lib/install';
-import { colors, space } from '@/lib/theme';
+import { space } from '@/lib/theme';
 
-// Configurações (referência "Settings").
+// Configurações: conta, instalação do app, regras de pontuação e sair.
 export default function Settings() {
   const me = useMe();
   const { signOut, session } = useAuth();
@@ -17,54 +16,37 @@ export default function Settings() {
 
   const rules = () =>
     notify(
-      'Regras de pontuação',
-      `Vitória +${POINTS.vitoria} · Derrota +${POINTS.derrota}\nAula (check-in) +${POINTS.aula}\nJogo reservado (check-in) +${POINTS.jogoAgendado}\n\nOs ${TOURNAMENT_SPOTS} primeiros do ranking são convidados para o torneio.`,
+      'Como funciona a pontuação?',
+      `Vitória +${POINTS.vitoria} · Derrota +${POINTS.derrota}\nAula (check-in) +${POINTS.aula}\nJogo reservado (check-in) +${POINTS.jogoAgendado}\n\nO resultado de um desafio só pontua depois que o adversário confirma.\nOs ${TOURNAMENT_SPOTS} primeiros do ranking são convidados para o torneio.`,
     );
+
+  const leave = async () => {
+    if (await confirmAsk('Sair da conta?', 'Você poderá entrar de novo quando quiser.', 'Sair')) signOut();
+  };
 
   return (
     <Screen>
-      <Header title="Configurações" />
+      <View style={{ gap: 8 }}>
+        <Eyebrow>Do seu jeito</Eyebrow>
+        <Headline>Configurações.</Headline>
+      </View>
 
-      <ListGroup>
-        <Pressable onPress={() => router.push('/edit-profile')} style={s.user}>
-          <Avatar name={me.name} url={me.avatarUrl} size={48} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontWeight: '600', fontSize: 16 }}>{me.name}</Text>
-            <Muted>@{me.username}</Muted>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-        </Pressable>
-      </ListGroup>
+      <Card style={{ gap: 6 }}>
+        <Text style={{ fontSize: 15, fontWeight: '500' }}>{me.name}</Text>
+        <Sub style={{ fontSize: 12 }}>@{me.username}</Sub>
+        <View style={{ marginTop: space.sm }}>
+          <Tag label="E-mail confirmado" />
+        </View>
+        <Sub style={{ fontSize: 11.5 }}>{session?.user.email}</Sub>
+      </Card>
 
-      <ListGroup>
-        <ListRow icon="person-outline" label="Editar perfil e foto" onPress={() => router.push('/edit-profile')} />
-        <ListRow icon="calendar-outline" label="Reservar quadra" onPress={() => router.dismissTo('/')} />
-        <ListRow icon="trophy-outline" label="Regras de pontuação" onPress={rules} last />
-      </ListGroup>
-
-      {install.show && (
-        <ListGroup>
-          <ListRow icon="download-outline" label="Instalar o app no celular" onPress={installApp} last />
-        </ListGroup>
-      )}
-
-      <ListGroup>
-        <ListRow icon="logo-instagram" label="Instagram do clube" onPress={() => Linking.openURL('https://www.instagram.com/in.tennisclub/')} />
-        <ListRow icon="mail-outline" label="Conta" value={session?.user.email ?? ''} />
-        <ListRow icon="information-circle-outline" label="Versão do app" value="1.0" last />
-      </ListGroup>
-
-      <View style={{ flex: 1, minHeight: space.xl }} />
-      <Pressable onPress={signOut} style={({ pressed }) => [s.logout, { opacity: pressed ? 0.85 : 1 }]}>
-        <Ionicons name="log-out-outline" size={20} color={colors.danger} />
-        <Text style={s.logoutText}>Sair da conta</Text>
-      </Pressable>
+      <View>
+        <ListRow label="Editar meu perfil" onPress={() => router.push('/edit-profile')} />
+        {install.show && <ListRow label="Instalar na tela inicial" onPress={installApp} />}
+        <ListRow label="Como funciona a pontuação?" onPress={rules} />
+        <ListRow label="Instagram do clube" onPress={() => Linking.openURL('https://www.instagram.com/in.tennisclub/')} />
+        <ListRow label="Sair da conta" onPress={leave} danger last />
+      </View>
     </Screen>
   );
 }
-
-const s = StyleSheet.create({
-  user: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg },
-  logout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 56, borderRadius: 999, backgroundColor: colors.cream },
-  logoutText: { color: colors.danger, fontWeight: '700', fontSize: 16 },
-});

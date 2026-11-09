@@ -1,12 +1,7 @@
-import {
-  Outfit_400Regular,
-  Outfit_500Medium,
-  Outfit_700Bold,
-  Outfit_800ExtraBold,
-  Outfit_900Black,
-} from '@expo-google-fonts/outfit';
+import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
+import { Newsreader_400Regular, Newsreader_400Regular_Italic, Newsreader_500Medium } from '@expo-google-fonts/newsreader';
 import { useFonts } from 'expo-font';
-import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -32,32 +27,25 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 const theme = {
-  ...DarkTheme,
+  ...DefaultTheme,
   colors: {
-    ...DarkTheme.colors,
-    background: colors.bg,
-    card: colors.bg,
-    primary: colors.accent,
-    text: colors.text,
+    ...DefaultTheme.colors,
+    background: colors.paper,
+    card: colors.paper,
+    primary: colors.forest2,
+    text: colors.ink,
     border: colors.border,
   },
 };
 
-const modal = (title: string) => ({
-  presentation: 'modal' as const,
-  title,
-  headerStyle: { backgroundColor: colors.surface },
-  headerTintColor: colors.text,
-  headerShadowVisible: false,
-});
-
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    Outfit_400Regular,
-    Outfit_500Medium,
-    Outfit_700Bold,
-    Outfit_800ExtraBold,
-    Outfit_900Black,
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_700Bold,
+    Newsreader_400Regular,
+    Newsreader_500Medium,
+    Newsreader_400Regular_Italic,
   });
 
   useEffect(() => {
@@ -69,6 +57,7 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <ThemeProvider value={theme}>
+        {/* a barra do topo é verde-escura: ícones do sistema em claro */}
         <StatusBar style="light" />
         <AppFrame>
           <RootNav />
@@ -89,7 +78,7 @@ function RootNav() {
 
   if (session && !player && profileError) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', padding: 24, gap: 12 }}>
+      <View style={{ flex: 1, backgroundColor: colors.paper, justifyContent: 'center', padding: 24, gap: 12 }}>
         <ErrorState message={profileError} onRetry={refreshPlayer} />
         <Button label="Sair da conta" variant="ghost" onPress={signOut} />
       </View>
@@ -98,8 +87,9 @@ function RootNav() {
 
   const authed = !!session && !!player;
 
+  // Todas as telas desenham a própria barra do topo (logo, voltar e avisos).
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.paper } }}>
       <Stack.Protected guard={!session}>
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
@@ -108,13 +98,18 @@ function RootNav() {
       </Stack.Protected>
       <Stack.Protected guard={authed}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="calendario" />
         <Stack.Screen name="checkout" />
-        <Stack.Screen name="new-post" options={{ headerShown: true, ...modal('Nova publicação') }} />
+        <Stack.Screen name="booking/[id]" />
+        <Stack.Screen name="event/[id]" />
+        <Stack.Screen name="challenges" />
+        <Stack.Screen name="match-result" />
+        <Stack.Screen name="new-post" />
+        <Stack.Screen name="comments" />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="avisos" />
         <Stack.Screen name="avatar-crop" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="match-result" options={{ headerShown: true, ...modal('Registrar resultado') }} />
-        <Stack.Screen name="comments" options={{ headerShown: true, ...modal('Comentários') }} />
       </Stack.Protected>
     </Stack>
   );
