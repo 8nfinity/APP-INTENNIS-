@@ -31,7 +31,6 @@ export type Booking = {
 };
 
 export type Teacher = { id: string; name: string; bio: string; pricePerHour: number; avatarUrl: string | null };
-export type AdminTeacher = Omit<Teacher, 'avatarUrl'> & { active: boolean; playerUsername: string | null; playerName: string | null };
 
 export type TeacherClass = {
   id: string;
@@ -81,24 +80,6 @@ export type Comment = {
   authorUsername: string;
   authorAvatarUrl: string | null;
 };
-
-export type AdminCourt = Court & { active: boolean };
-
-export type AdminBooking = {
-  id: string;
-  courtId: string;
-  courtName: string;
-  date: string;
-  hour: number;
-  kind: BookingKind;
-  price: number;
-  status: Booking['status'];
-  playerName: string;
-  playerUsername: string;
-  teacherName: string | null;
-};
-
-export type CourtBlock = { id: string; courtId: string; courtName: string; date: string; hour: number; reason: string };
 
 export type GameEvent = {
   id: string;

@@ -39,8 +39,7 @@ export default function Settings() {
       <ListGroup>
         <ListRow icon="person-outline" label="Editar perfil e foto" onPress={() => router.push('/edit-profile')} />
         <ListRow icon="calendar-outline" label="Reservar quadra" onPress={() => router.dismissTo('/')} />
-        <ListRow icon="trophy-outline" label="Regras de pontuação" onPress={rules} last={!me.isAdmin} />
-        {me.isAdmin && <ListRow icon="shield-checkmark-outline" label="Painel administrativo" onPress={() => router.push('/admin')} last />}
+        <ListRow icon="trophy-outline" label="Regras de pontuação" onPress={rules} last />
       </ListGroup>
 
       {install.show && (

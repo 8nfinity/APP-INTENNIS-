@@ -116,9 +116,6 @@ function RootNav() {
         <Stack.Screen name="match-result" options={{ headerShown: true, ...modal('Registrar resultado') }} />
         <Stack.Screen name="comments" options={{ headerShown: true, ...modal('Comentários') }} />
       </Stack.Protected>
-      <Stack.Protected guard={authed && !!player?.isAdmin}>
-        <Stack.Screen name="admin" />
-      </Stack.Protected>
     </Stack>
   );
 }

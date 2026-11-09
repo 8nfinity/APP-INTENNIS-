@@ -97,7 +97,7 @@ export default function Eventos() {
         </Pressable>
       </View>
 
-      {/* Abas da referência: lista, calendário e (admin) novo evento */}
+      {/* Abas da referência: lista e calendário */}
       <View style={s.tabs}>
         {(
           [
@@ -109,11 +109,6 @@ export default function Eventos() {
             <Ionicons name={t.icon} size={21} color={view === t.key ? colors.cream : colors.muted} />
           </Pressable>
         ))}
-        {me.isAdmin && (
-          <Pressable onPress={() => router.push('/admin/events')} style={s.tab}>
-            <Ionicons name="add-circle-outline" size={22} color={colors.muted} />
-          </Pressable>
-        )}
       </View>
 
       {loading && <Loading />}
