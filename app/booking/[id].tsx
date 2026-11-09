@@ -7,6 +7,7 @@ import { useFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { checkinInfo, courtLabel, doCheckIn, pad2 } from '@/lib/booking';
 import { longDay } from '@/lib/dates';
+import { photoForSurface } from '@/lib/photos';
 import { colors, radius, space } from '@/lib/theme';
 import { Booking, Court } from '@/lib/types';
 
@@ -54,7 +55,7 @@ export default function BookingDetail() {
         </View>
         <Title>{court ? courtLabel(court.name, courts.indexOf(court)) : 'Quadra'}</Title>
         <View style={s.photo}>
-          <PhotoBackdrop kind="event" fade={false} />
+          <PhotoBackdrop kind="plain" photo={photoForSurface(court?.surface)} />
         </View>
         <View style={{ gap: 10 }}>
           <Row label="Data" value={longDay(b.date)} />

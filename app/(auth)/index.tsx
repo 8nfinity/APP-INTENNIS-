@@ -20,7 +20,7 @@ export default function Welcome() {
         contentContainerStyle={[s.content, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 24, paddingLeft: padL + 8, paddingRight: padR + 8, gap: space.xl }]}>
         <View style={s.top}>
           <Logo variant="full" height={58} />
-          <Text style={s.tagline}>{'Tênis.\nEncontros.\nHistórias.'}</Text>
+          <Text style={s.tagline}>{'Tênis. Encontros.\nHistórias.'}</Text>
         </View>
 
         <View style={{ gap: space.md }}>

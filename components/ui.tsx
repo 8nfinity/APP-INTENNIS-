@@ -23,6 +23,7 @@ import {
 import { Logo } from '@/components/Logo';
 import { PhotoBackdrop } from '@/components/PhotoBackdrop';
 import { useLayout } from '@/lib/layout';
+import { PhotoName } from '@/lib/photos';
 import { FONT, colors, radius, space } from '@/lib/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -159,7 +160,7 @@ export function Screen({
   tone?: Tone;
   bar?: boolean;
   back?: boolean;
-  photo?: 'welcome' | 'court' | 'event';
+  photo?: PhotoName;
   refreshing?: boolean;
   onRefresh?: () => void;
   tab?: boolean; // dentro das abas: a barra de abas já cuida da margem de baixo
@@ -170,7 +171,7 @@ export function Screen({
   return (
     <ToneContext.Provider value={tone}>
       <View style={{ flex: 1, backgroundColor: dark ? colors.forest : colors.paper }}>
-        {dark && <PhotoBackdrop kind={photo ?? 'court'} />}
+        {dark && <PhotoBackdrop kind="court" photo={photo} />}
         {bar && <TopBar back={back} transparent={dark} />}
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView

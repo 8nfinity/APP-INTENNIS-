@@ -14,7 +14,7 @@ export function EventPhoto({ e, height = 190 }: { e: GameEvent; height?: number 
   const d = parseISO(e.date);
   return (
     <View style={[s.photo, { height }]}>
-      <PhotoBackdrop kind="event" fade={false} />
+      <PhotoBackdrop kind="card" photo={e.category === 'aula' || e.category === 'novidade' ? 'green' : 'clay'} />
       <View style={s.badge}>
         <Text style={{ fontSize: 9.5, color: colors.muted }}>{MONTHS_SHORT[d.getMonth()]}</Text>
         <Text style={{ fontSize: 22, fontWeight: '500', lineHeight: 24 }}>{d.getDate()}</Text>

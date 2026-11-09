@@ -10,6 +10,7 @@ import { WEEK_SHORT, addDays, longDay, occupancyDots, parseISO } from '@/lib/dat
 import { setDraft, useDraft } from '@/lib/draft';
 import { toISO } from '@/lib/game';
 import { useLayout } from '@/lib/layout';
+import { photoForSurface } from '@/lib/photos';
 import { colors, radius, space } from '@/lib/theme';
 import { Court, Teacher } from '@/lib/types';
 
@@ -62,7 +63,7 @@ export default function Agendar() {
   };
 
   return (
-    <Screen tone="dark" photo="court" back={false} tab refreshing={false} onRefresh={reload}>
+    <Screen tone="dark" photo={photoForSurface(court?.surface)} back={false} tab refreshing={false} onRefresh={reload}>
       <InstallBanner />
       <View style={{ gap: 8 }}>
         <Eyebrow>Bora pra quadra</Eyebrow>
@@ -116,9 +117,12 @@ export default function Agendar() {
           ))}
         </View>
         {court && (
-          <Sub>
-            {court.surface} · {formatBRL(court.pricePerHour)} por hora{teacher ? ` + ${formatBRL(teacher.pricePerHour)} do professor` : ''}
-          </Sub>
+          <View style={s.rowBetween}>
+            <Sub style={{ flex: 1 }}>
+              {court.surface} · {formatBRL(court.pricePerHour)} por hora{teacher ? ` + ${formatBRL(teacher.pricePerHour)} do professor` : ''}
+            </Sub>
+            <Sub style={{ fontSize: 10, opacity: 0.7 }}>Imagem ilustrativa</Sub>
+          </View>
         )}
       </View>
 

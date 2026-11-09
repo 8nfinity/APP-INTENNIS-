@@ -1,12 +1,12 @@
-// Fotos do clube (jogador sacando, quadras de saibro, etc.).
-// Enquanto uma foto não for configurada aqui, o app mostra uma ilustração no lugar.
-// Para usar uma foto: suba o arquivo (Supabase Storage, bucket público) e cole a URL abaixo.
-export const PHOTOS: {
-  welcome: string | null; // tela de entrada (jogador sacando na quadra de saibro)
-  court: string | null; // fundo da tela de reservas e foto das quadras
-  event: string | null; // foto padrão dos eventos
-} = {
-  welcome: null,
-  court: null,
-  event: null,
+// Fotos do clube, usadas nas telas (jogador sacando, quadra de saibro, quadra rápida).
+// Para trocar uma foto, substitua o arquivo em assets/images mantendo o mesmo nome.
+export const PHOTOS = {
+  player: require('../assets/images/photo-player.jpg'),
+  clay: require('../assets/images/photo-clay.jpg'),
+  green: require('../assets/images/photo-green.jpg'),
 };
+
+export type PhotoName = keyof typeof PHOTOS;
+
+// Qual foto combina com o piso da quadra ("Saibro" = terra batida, "Rápida" = piso verde)
+export const photoForSurface = (surface?: string): PhotoName => (/r[aá]pida|dura|sint/i.test(surface ?? '') ? 'green' : 'clay');

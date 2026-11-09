@@ -17,7 +17,7 @@ export function AuthLayout({ children, line, heading, back = true }: { children:
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
           <View style={{ height: (short ? 190 : 250) + insets.top, justifyContent: 'space-between', paddingTop: insets.top + 12, paddingBottom: 44, paddingLeft: padL + 4, paddingRight: padR + 4 }}>
-            <PhotoBackdrop kind="welcome" fade={false} />
+            <PhotoBackdrop kind="auth" focus="top" />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               {back ? (
                 <Pressable onPress={goBack} hitSlop={8} style={s.pill}>
