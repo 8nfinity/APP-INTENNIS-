@@ -3,6 +3,14 @@ const SUPABASE_URL='https://qyfvnqktlxpwnbwpfbeo.supabase.co',SUPABASE_KEY='sb_p
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])), money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n);
 const spNow=()=>{let d=new Date();return{date:d.toLocaleDateString('en-CA',{timeZone:TZ}),hour:Number(d.toLocaleTimeString('en-GB',{timeZone:TZ,hour:'2-digit',hour12:false}).slice(0,2))}};
 let today=spNow().date;
+/* iPhone em tela cheia: a janela da página às vezes fica mais baixa que a tela (faixa em branco embaixo). Usa a altura real da tela. */
+function fitHeight(){
+  let standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches,portrait=innerHeight>=innerWidth,h=innerHeight;
+  if(standalone&&portrait){let sh=Math.max(screen.height,screen.width);if(sh-h>=1&&sh-h<=120)h=sh}
+  document.documentElement.style.setProperty('--app-h',h+'px');
+}
+fitHeight();addEventListener('resize',fitHeight);addEventListener('orientationchange',()=>setTimeout(fitHeight,300));
+
 const dateISO=d=>new Date(d+'T12:00:00'), dayLabel=d=>dateISO(d).toLocaleDateString('pt-BR',{day:'numeric',month:'long'}), shortDate=d=>dateISO(d).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}), addDays=(d,n)=>{let x=dateISO(d);x.setDate(x.getDate()+n);return x.toLocaleDateString('en-CA')}, maxDate=()=>addDays(today,365), hh=h=>String(h).padStart(2,'0')+':00';
 const paths={calendar:'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2z',trophy:'M8 3h8v7a4 4 0 0 1-8 0V3zm0 2H4v3a4 4 0 0 0 4 4m8-7h4v3a4 4 0 0 1-4 4m-4 2v6m-5 1h10',events:'M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z',social:'M21 11a8 8 0 0 1-8 8H7l-5 3 2-6a8 8 0 1 1 17-5z',user:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 22v-3a8 8 0 0 1 16 0v3',arrow:'M5 12h14m-5-5 5 5-5 5',bell:'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-12 12h6',check:'M5 12l4 4L20 5',plus:'M12 4v16M4 12h16',heart:'M12 21S2 15 2 8a5 5 0 0 1 10-1A5 5 0 0 1 22 8c0 7-10 13-10 13z',share:'M15 3l6 6-6 6m6-6H9a5 5 0 0 0-5 5v6',settings:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM9 3l-1 3-3 1-2 4 2 3 1 3 4 3 3-1 3-1 3-4-1-3-1-3-4-3-3 1z',clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4v6l4 2',grid:'M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z',back:'M15 5l-7 7 7 7'};
 const icon=n=>`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[n]||paths.calendar}"/></svg>`;
