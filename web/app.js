@@ -100,12 +100,10 @@ function renderApp(keepScroll){
   if(['schedule','lesson','calendar','checkout'].includes(pageName)&&db.me){ensureAvail();ensureSummary()}
 }
 function paintEdges(p){
-  /* iOS 26 pinta uma faixa translúcida nas bordas da tela usando a cor de elementos fixos junto às bordas.
-     Duas tiras fixas com as cores do topo e do menu fazem essa faixa ficar igual ao app. */
+  /* fundo sólido da página com a cor do topo de cada tela (aparece ao puxar a tela além do limite) */
   let dark=['schedule','lesson'].includes(p),entry=['welcome','register','login','verify','recover','boot'].includes(p),fresh=p==='edit'&&state.newProfile;
   let top=dark||entry||fresh?'#0b1c17':'#172d24',bottom=dark?'#101a13':entry||fresh?'#0b1c17':'#ffffff';
   let root=document.documentElement;root.style.backgroundColor=top;root.style.backgroundImage='none';document.body.style.backgroundColor=top;
-  let t=$('#edge-top'),b=$('#edge-bottom');if(t)t.style.backgroundColor=top;if(b)b.style.backgroundColor=bottom;
   document.querySelector('meta[name=theme-color]')?.setAttribute('content',top);
 }
 const navs=[['schedule','calendar','Agendar'],['ranking','trophy','Ranking'],['events','events','Eventos'],['social','social','Social'],['profile','user','Perfil']];
