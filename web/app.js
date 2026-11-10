@@ -94,8 +94,17 @@ function renderApp(keepScroll){
   let sc=$('#phone .app-scroll'),top=sc&&keepScroll?sc.scrollTop:0,pageName=state.page;
   $('#phone').innerHTML=shell(state.page);
   if(top){let n=$('#phone .app-scroll');if(n)n.scrollTop=top}
+  paintEdges(pageName);
   clearInterval(timerHandle);if(pageName==='checkout'){updateTimer();timerHandle=setInterval(updateTimer,1000)}
   if(['schedule','lesson','calendar','checkout'].includes(pageName)&&db.me){ensureAvail();ensureSummary()}
+}
+function paintEdges(p){
+  /* cores das faixas fora do app (barra de status e base do iPhone) iguais ao topo e ao menu de cada tela */
+  let dark=['schedule','lesson'].includes(p),entry=['welcome','register','login','verify','recover','boot'].includes(p),fresh=p==='edit'&&state.newProfile;
+  let top=dark?'#0b1c17':entry||fresh?'#0b1c17':'#172d24',bottom=dark?'#101a13':entry||fresh?'#0b1c17':'#ffffff';
+  let g=`linear-gradient(180deg,${top} 0,${top} 90px,${bottom} 90px,${bottom} 100%)`;
+  document.documentElement.style.background=g;document.body.style.background='transparent';
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content',top);
 }
 const navs=[['schedule','calendar','Agendar'],['ranking','trophy','Ranking'],['events','events','Eventos'],['social','social','Social'],['profile','user','Perfil']];
 const selectedCourt=()=>db.courts.find(x=>x.id===state.court)||db.courts[0]||{id:'',name:'Quadra',floor:'',price:0};
