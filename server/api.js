@@ -323,6 +323,24 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     res.json({ ok: true });
   }));
 
+  // A própria pessoa libera/cancela a reserva (pendente ou paga) enquanto ela ainda não começou.
+  r.post('/bookings/:id/cancel', wrap(async (req, res) => {
+    const p = await needMe(req);
+    if (!UUID.test(req.params.id)) throw bad('Reserva inválida');
+    const b = (await pool.query(
+      `select id, to_char(date,'YYYY-MM-DD') as date, hour, status from bookings where id = $1 and player_id = $2`,
+      [req.params.id, p.id],
+    )).rows[0];
+    if (!b) throw new HttpError(404, 'Reserva não encontrada');
+    if (!['pendente', 'pago'].includes(b.status)) throw new HttpError(409, 'Essa reserva não pode mais ser cancelada');
+    const now = nowSp();
+    if (b.status === 'pago' && (b.date < now.date || (b.date === now.date && b.hour <= now.hour))) {
+      throw new HttpError(409, 'Reservas que já começaram não podem ser canceladas');
+    }
+    await pool.query("update bookings set status = 'cancelado' where id = $1", [b.id]);
+    res.json({ ok: true });
+  }));
+
   r.post('/bookings/:id/checkin', wrap(async (req, res) => {
     const p = await needMe(req);
     if (!UUID.test(req.params.id)) throw bad('Reserva inválida');

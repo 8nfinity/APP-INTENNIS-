@@ -1,0 +1,8 @@
+/* Tela direta para integração: mantém o design interno do protótipo. */
+body { background: #101c14; }
+.board-head,.intro,.board-controls,.gallery,.board-foot,.proto-toolbar,.flow-guide { display:none; }
+#prototype .proto-stage { padding:0; gap:0; height:100%; }
+#phone.phone { border:0; border-radius:0; box-shadow:none; width:min(100%,520px); height:100%; max-width:none; }
+@media(max-width:750px) { #phone.phone { width:100%; } }
+#phone .welcome { padding-top:max(27px,env(safe-area-inset-top)); padding-bottom:max(20px,env(safe-area-inset-bottom)); }
+#phone .auth-visual { padding-top:max(16px,env(safe-area-inset-top)); }

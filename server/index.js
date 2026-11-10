@@ -80,7 +80,7 @@ if (pool) {
   app.use('/api', (_req, res) => res.status(503).json({ error: 'Banco não configurado' }));
 }
 
-// Versão web do app (gerada por `expo export --platform web`).
+// Versão web do app (pasta web/, copiada para public/ no Docker).
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir, { extensions: ['html'] }));
 app.use((req, res) => {
