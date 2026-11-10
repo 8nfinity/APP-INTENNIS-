@@ -10,3 +10,5 @@ html,body{height:100%;margin:0;background-color:#0b1c17;overscroll-behavior:none
 /* campo de data não pode passar da largura da tela (iOS) */
 .field input[type=date],.field input[type=time]{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;text-align:center;min-height:46px}
 .field input[type=date]::-webkit-date-and-time-value{text-align:center;margin:0}
+/* menu inferior mais baixo: a área do indicador do iPhone fica bem menor (sem barra vazia embaixo) */
+.phone .nav{padding-bottom:max(8px,calc(env(safe-area-inset-bottom) - 22px));min-height:0}
