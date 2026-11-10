@@ -1,0 +1,13 @@
+/* Ajustes para aparelhos reais (iPhone/Android em tela cheia): áreas seguras, altura e campos de data. */
+html,body{height:100%;margin:0;background:#f7f8f3;overscroll-behavior:none}
+body{background:#f7f8f3}
+.prototype{inset:auto;top:0;left:0;right:0;width:100%;height:100vh;height:100dvh}
+.proto-stage{height:100%}
+#phone.phone{height:100%}
+/* topo sólido (sem blur) e abaixo da barra de status */
+.phone .app-top,.schedule-shell .app-top{padding-top:max(14px,env(safe-area-inset-top));backdrop-filter:none;-webkit-backdrop-filter:none}
+.schedule-shell .app-top{background:#0b1c17}
+.phone .app-top .top-link{position:relative;z-index:1}
+/* campo de data não pode passar da largura da tela (iOS) */
+.field input[type=date],.field input[type=time]{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;text-align:center;min-height:46px}
+.field input[type=date]::-webkit-date-and-time-value{text-align:center;margin:0}
