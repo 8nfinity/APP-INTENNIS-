@@ -12,3 +12,8 @@ html,body{height:100%;margin:0;background-color:#0b1c17;overscroll-behavior:none
 .field input[type=date]::-webkit-date-and-time-value{text-align:center;margin:0}
 /* menu inferior mais baixo: a área do indicador do iPhone fica bem menor (sem barra vazia embaixo) */
 .phone .nav{padding-bottom:max(8px,calc(env(safe-area-inset-bottom) - 22px));min-height:0}
+/* faixa abaixo da tela: pinta a sobra que o iPhone às vezes deixa embaixo com a cor do menu */
+body::after{content:'';position:fixed;left:0;right:0;bottom:-140px;height:140px;background:var(--edge-bottom,#0b1c17);z-index:0;pointer-events:none}
+/* tela de carregamento: uma cor só */
+#phone .app-scroll.page-boot{background:#0b1c17!important;display:flex;align-items:center;justify-content:center;padding:0!important}
+.boot-logo{font:italic 700 44px Georgia,serif;color:#f5f5ed;letter-spacing:-1px}.boot-logo span{color:#d9ed8a}

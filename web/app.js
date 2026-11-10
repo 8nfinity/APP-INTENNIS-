@@ -100,10 +100,10 @@ function renderApp(keepScroll){
   if(['schedule','lesson','calendar','checkout'].includes(pageName)&&db.me){ensureAvail();ensureSummary()}
 }
 function paintEdges(p){
-  /* fundo da página com a cor do menu de cada tela: se o iPhone deixar sobra embaixo, ela parece parte do menu */
+  /* fundo da página com a cor do topo de cada tela (a barra de status usa essa cor); a sobra embaixo usa a cor do menu */
   let dark=['schedule','lesson'].includes(p),entry=['welcome','register','login','verify','recover','boot'].includes(p),fresh=p==='edit'&&state.newProfile;
   let top=dark||entry||fresh?'#0b1c17':'#172d24',bottom=dark?'#0f2119':entry||fresh?'#0b1c17':'#fdfdfb';
-  let root=document.documentElement;root.style.backgroundColor=bottom;root.style.backgroundImage='none';document.body.style.backgroundColor=bottom;
+  let root=document.documentElement;root.style.backgroundColor=top;root.style.backgroundImage='none';document.body.style.backgroundColor=top;root.style.setProperty('--edge-bottom',bottom);
   document.querySelector('meta[name=theme-color]')?.setAttribute('content',top);
 }
 const navs=[['schedule','calendar','Agendar'],['ranking','trophy','Ranking'],['events','events','Eventos'],['social','social','Social'],['profile','user','Perfil']];
@@ -179,7 +179,7 @@ function editHTML(){
   return sectionHeader(fresh?'Quase lá':'Seu perfil',fresh?'Crie seu perfil.':'Faça do seu jeito.')+`<form data-form="profile"><div class="crop-preview" id="cropPreview" style="--zoom:${state.zoom}">${img?`<img src="${esc(img)}" alt="Prévia de enquadramento">`:''}</div><div class="field"><label for="photo">Foto de perfil</label><input id="photo" type="file" accept="image/*" data-photo></div><div class="field"><label for="zoom">Ajustar enquadramento</label><input id="zoom" type="range" min="1" max="2.5" step="0.05" value="${state.zoom}" data-zoom></div><div class="field"><label for="name">Nome</label><input id="name" name="name" value="${esc(p.name)}" required minlength="2" maxlength="60"></div><div class="field"><label for="handle">@usuário</label><input id="handle" name="handle" value="${esc(p.username)}" pattern="[a-z0-9._]{3,20}" title="3 a 20 letras minúsculas, números, ponto ou underline" autocapitalize="none" required></div><div class="field"><label for="bio">Bio</label><textarea id="bio" name="bio" maxlength="160">${esc(p.bio||'')}</textarea></div><button class="primary" type="submit">${fresh?'Entrar no clube':'Salvar perfil'}</button></form>${fresh?btn('Sair','logout','text-btn mt'):''}`;
 }
 function page(p){switch(p){
-case'boot':return `<div class="empty center" style="padding-top:38vh;font:italic 34px Georgia;color:#172d24">IN.</div>`;
+case'boot':return `<div class="boot-logo">IN<span>.</span></div>`;
 case'welcome':return `<div class="welcome"><div class="welcome-logo">IN.<small>TENNIS CLUB</small></div><span class="welcome-label">TÊNIS. ENCONTROS. HISTÓRIAS.</span><div class="welcome-copy"><h1>Are you<br>IN<span>.</span>?</h1><p>Mais do que tênis, um lugar para pertencer.</p><p>Reserve quadras, jogue com a galera e suba no ranking.</p></div><div class="stack welcome-actions">${btn('Criar minha conta '+icon('arrow'),'go:register')}${btn('Já tenho conta','go:login','secondary')}</div></div>`;
 case'login':case'register':case'recover':case'verify':return authHTML(p);
 case'schedule':return scheduleHTML();case'lesson':return scheduleHTML(true);
