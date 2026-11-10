@@ -100,10 +100,10 @@ function renderApp(keepScroll){
   if(['schedule','lesson','calendar','checkout'].includes(pageName)&&db.me){ensureAvail();ensureSummary()}
 }
 function paintEdges(p){
-  /* fundo sólido da página com a cor do topo de cada tela (aparece ao puxar a tela além do limite) */
+  /* fundo da página com a cor do menu de cada tela: se o iPhone deixar sobra embaixo, ela parece parte do menu */
   let dark=['schedule','lesson'].includes(p),entry=['welcome','register','login','verify','recover','boot'].includes(p),fresh=p==='edit'&&state.newProfile;
-  let top=dark||entry||fresh?'#0b1c17':'#172d24',bottom=dark?'#101a13':entry||fresh?'#0b1c17':'#ffffff';
-  let root=document.documentElement;root.style.backgroundColor=top;root.style.backgroundImage='none';document.body.style.backgroundColor=top;
+  let top=dark||entry||fresh?'#0b1c17':'#172d24',bottom=dark?'#0f2119':entry||fresh?'#0b1c17':'#fdfdfb';
+  let root=document.documentElement;root.style.backgroundColor=bottom;root.style.backgroundImage='none';document.body.style.backgroundColor=bottom;
   document.querySelector('meta[name=theme-color]')?.setAttribute('content',top);
 }
 const navs=[['schedule','calendar','Agendar'],['ranking','trophy','Ranking'],['events','events','Eventos'],['social','social','Social'],['profile','user','Perfil']];
