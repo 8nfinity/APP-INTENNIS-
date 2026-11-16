@@ -1,9 +1,9 @@
 -- Schema do In Tennis Club. É idempotente: pode ser rodado várias vezes.
--- Aplicar com: railway run --service web node server/migrate.js
+-- Aplicar com: DATABASE_URL=... node server/migrate.js
 
 create table if not exists players (
   id uuid primary key default gen_random_uuid(),
-  auth_user_id uuid unique,               -- liga ao login do Supabase Auth
+  auth_user_id uuid unique,               -- liga ao usuário do Neon Auth
   name text not null,
   username text not null unique check (username ~ '^[a-z0-9._]{3,20}$'),
   bio text not null default '',
@@ -154,8 +154,8 @@ create table if not exists event_interests (
 );
 alter table event_interests enable row level security;
 
--- Segurança: com RLS ligado e nenhuma policy, a chave pública do Supabase não
--- lê nem escreve nestas tabelas. Só o servidor (conexão direta, DATABASE_URL)
+-- Segurança: com RLS ligado e nenhuma policy, nenhuma conexão pública
+-- lê nem escreve nestas tabelas. Só o servidor (DATABASE_URL)
 -- acessa, e ele valida o login e as permissões de cada pedido.
 alter table players      enable row level security;
 alter table courts       enable row level security;
@@ -182,39 +182,4 @@ select * from (values
 ) as v(title, description, category, date, place)
 where not exists (select 1 from events);
 
--- Armazenamento de fotos e vídeos dos posts. Cada pessoa só envia para a
--- própria pasta (<id do usuário>/arquivo). Leitura pública, limite de 20 MB.
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('posts', 'posts', true, 20971520, array['image/jpeg','image/png','image/webp','video/mp4'])
-on conflict (id) do update set
-  public = excluded.public,
-  file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
-
--- Fotos de perfil: mesma regra (só na própria pasta), limite de 5 MB, só imagens.
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('avatars', 'avatars', true, 5242880, array['image/jpeg','image/png','image/webp'])
-on conflict (id) do update set
-  public = excluded.public,
-  file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
-
-drop policy if exists "avatars_upload_own_folder" on storage.objects;
-create policy "avatars_upload_own_folder" on storage.objects
-  for insert to authenticated
-  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
-
-drop policy if exists "avatars_delete_own_files" on storage.objects;
-create policy "avatars_delete_own_files" on storage.objects
-  for delete to authenticated
-  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
-
-drop policy if exists "posts_upload_own_folder" on storage.objects;
-create policy "posts_upload_own_folder" on storage.objects
-  for insert to authenticated
-  with check (bucket_id = 'posts' and (storage.foldername(name))[1] = auth.uid()::text);
-
-drop policy if exists "posts_delete_own_files" on storage.objects;
-create policy "posts_delete_own_files" on storage.objects
-  for delete to authenticated
-  using (bucket_id = 'posts' and (storage.foldername(name))[1] = auth.uid()::text);
+-- Fotos e vídeos ficam no Neon Object Storage (bucket "fotos"); aqui guardamos só a chave do arquivo.

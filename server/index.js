@@ -4,10 +4,11 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 
-const { requireAuth } = require('./auth');
+const { requireAuth, authRouter } = require('./auth');
 const buildApi = require('./api');
 
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
+// Arquivos ficam no Neon Object Storage (links temporários *.neon.tech).
+const STORAGE_HOST = 'https://*.neon.tech';
 
 const app = express();
 app.set('trust proxy', 1); // Railway fica na frente: necessário para o limite por IP
@@ -20,11 +21,11 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'blob:', 'https://*.supabase.co'],
-        mediaSrc: ["'self'", 'blob:', 'https://*.supabase.co'],
+        imgSrc: ["'self'", 'data:', 'blob:', STORAGE_HOST],
+        mediaSrc: ["'self'", 'blob:', STORAGE_HOST],
         fontSrc: ["'self'", 'data:'],
         // blob:/data: permitem ao app ler a foto/vídeo escolhido no navegador antes do envio
-        connectSrc: ["'self'", 'blob:', 'data:', 'https://*.supabase.co', 'wss://*.supabase.co'],
+        connectSrc: ["'self'", 'blob:', 'data:', STORAGE_HOST],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
       },
@@ -33,7 +34,7 @@ app.use(
 );
 app.use(express.json({ limit: '20kb' }));
 
-// Banco: Supabase Postgres. Defina DATABASE_URL nas variáveis do Railway.
+// Banco: Neon Postgres. Defina DATABASE_URL nas variáveis do servidor.
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: process.env.VERCEL ? 3 : 10 })
   : null;
@@ -60,6 +61,16 @@ const limits = {
   }),
 };
 
+// Login, cadastro e recuperação de senha (públicos, com limite mais rígido contra tentativas em massa)
+const authLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas. Aguarde alguns minutos.' },
+});
+app.use('/api/auth', authLimit, authRouter(express));
+
 if (pool) {
   app.use(
     '/api',
@@ -68,7 +79,6 @@ if (pool) {
     requireAuth,
     buildApi(pool, {
       simulatedPayments: process.env.ALLOW_SIMULATED_PAYMENTS === 'true',
-      supabaseUrl: SUPABASE_URL,
       // E-mails (separados por vírgula) que viram administradores ao entrar, se o e-mail estiver confirmado.
       adminEmails: (process.env.ADMIN_EMAILS || '')
         .split(',')

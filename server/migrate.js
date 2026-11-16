@@ -1,4 +1,4 @@
-// Aplica o schema.sql no banco. Uso: railway run --service web node server/migrate.js
+// Aplica o schema.sql no banco. Uso: DATABASE_URL=... node server/migrate.js
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');

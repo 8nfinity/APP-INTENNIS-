@@ -1,4 +1,5 @@
 const express = require('express');
+const storage = require('./storage');
 
 const HOURS = [7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 21];
 const POINTS = { match_win: 30, match_loss: 10, booking_jogo: 10, booking_aula: 20 };
@@ -51,8 +52,17 @@ const PLAYER_SQL = `
     (select count(*) from bookings b where b.player_id = p.id and b.kind = 'aula' and b.status = 'concluido')::int as classes
   from players p`;
 
-module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, adminEmails = [] }) {
+module.exports = function buildApi(pool, { simulatedPayments, adminEmails = [] }) {
   const r = express.Router();
+  // chaves de arquivo (avatarUrl, mediaUrl...) viram links temporários de leitura em toda resposta
+  r.use((_req, res, next) => {
+    const send = res.json.bind(res);
+    res.json = (body) => {
+      storage.signDeep(body).then(send).catch(() => send(body));
+      return res;
+    };
+    next();
+  });
   const wrap = (fn) => (req, res, next) => fn(req, res).catch(next);
 
   async function me(req) {
@@ -76,7 +86,6 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     if (!p.isAdmin) throw new HttpError(403, 'Apenas administradores');
     return p;
   }
-  const avatarPrefix = (uid) => `${supabaseUrl}/storage/v1/object/public/avatars/${uid}/`;
   async function withStreaks(players) {
     if (!players.length) return players;
     const { rows } = await pool.query(
@@ -126,13 +135,13 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
       req.body.username === undefined ? p.username : str(req.body.username, { min: 3, max: 20, field: 'Usuário' }).toLowerCase();
     if (!USERNAME.test(username)) throw bad('Usuário: 3 a 20 letras minúsculas, números, ponto ou underline');
     let avatarUrl = p.avatarUrl;
-    if (req.body.avatarUrl !== undefined) {
-      if (req.body.avatarUrl === null) avatarUrl = null;
+    if (req.body.avatarKey !== undefined) {
+      if (req.body.avatarKey === null) avatarUrl = null;
       else {
-        // Só aceita foto enviada para a pasta da própria pessoa no nosso storage.
-        const u = req.body.avatarUrl;
-        if (typeof u !== 'string' || !u.startsWith(avatarPrefix(req.user.id)) || u.length > 400) throw bad('Foto inválida');
-        avatarUrl = u;
+        // Só aceita foto enviada para a pasta da própria pessoa.
+        const k = req.body.avatarKey;
+        if (typeof k !== 'string' || !k.startsWith(`avatars/${p.id}/`) || k.length > 200) throw bad('Foto inválida');
+        avatarUrl = k;
       }
     }
     try {
@@ -146,8 +155,20 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     res.json({ player: (await withStreaks([await me(req)]))[0] });
   }));
 
+  // Link temporário para o app enviar a foto/vídeo direto ao storage.
+  r.post('/uploads', wrap(async (req, res) => {
+    const p = await needMe(req);
+    const kind = req.body.kind;
+    if (!['avatar', 'post'].includes(kind)) throw bad('Tipo inválido');
+    if (kind === 'avatar' && !String(req.body.contentType).startsWith('image/')) throw bad('A foto de perfil precisa ser uma imagem');
+    if (!storage.enabled) throw new HttpError(503, 'Envio de arquivos indisponível');
+    const up = await storage.presignUpload(kind === 'avatar' ? 'avatars' : 'posts', p.id, String(req.body.contentType));
+    if (!up) throw bad('Formato não aceito. Use JPG, PNG, WEBP, MP4 ou MOV.');
+    res.json({ uploadUrl: up.url, key: up.key });
+  }));
+
   // Apaga todos os dados da pessoa. A conta de login em si precisa ser removida
-  // pelo painel do Supabase (exige a chave de serviço, que não fica neste servidor).
+  // pelo painel do Neon Auth (Neon Console > Auth).
   r.delete('/me', wrap(async (req, res) => {
     await pool.query('delete from players where auth_user_id = $1', [req.user.id]);
     res.json({ ok: true });
@@ -530,13 +551,11 @@ module.exports = function buildApi(pool, { simulatedPayments, supabaseUrl, admin
     const score = str(req.body.score ?? '', { max: 40, field: 'Placar' }) || null;
     if (!['jogo', 'treino', 'foto', 'video'].includes(req.body.tag)) throw bad('Tipo inválido');
     let mediaUrl = null;
-    if (req.body.mediaUrl) {
-      // Só aceita mídia enviada para a pasta da própria pessoa no nosso storage.
-      const prefix = `${supabaseUrl}/storage/v1/object/public/posts/${req.user.id}/`;
-      if (typeof req.body.mediaUrl !== 'string' || !req.body.mediaUrl.startsWith(prefix) || req.body.mediaUrl.length > 400) {
-        throw bad('Mídia inválida');
-      }
-      mediaUrl = req.body.mediaUrl;
+    if (req.body.mediaKey) {
+      // Só aceita mídia enviada para a pasta da própria pessoa.
+      const k = req.body.mediaKey;
+      if (typeof k !== 'string' || !k.startsWith(`posts/${p.id}/`) || k.length > 200) throw bad('Mídia inválida');
+      mediaUrl = k;
     }
     if (!text && !mediaUrl) throw bad('Escreva algo ou anexe uma mídia');
     await pool.query('insert into posts (author_id, text, media_url, tag, score) values ($1,$2,$3,$4,$5)', [

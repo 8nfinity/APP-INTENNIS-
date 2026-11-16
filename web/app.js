@@ -1,5 +1,5 @@
 /* IN Tennis Club — telas do protótipo oficial ligadas ao servidor real (API + Supabase). */
-const SUPABASE_URL='https://qyfvnqktlxpwnbwpfbeo.supabase.co',SUPABASE_KEY='sb_publishable_3o3nGIoot4LrY_ELoXmWYg_bORMpjIK',TZ='America/Sao_Paulo';
+const TZ='America/Sao_Paulo';
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])), money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n);
 const spNow=()=>{let d=new Date();return{date:d.toLocaleDateString('en-CA',{timeZone:TZ}),hour:Number(d.toLocaleTimeString('en-GB',{timeZone:TZ,hour:'2-digit',hour12:false}).slice(0,2))}};
 let today=spNow().date;
@@ -12,16 +12,27 @@ const btn=(t,a,kind='primary',extra='')=>`<button class="${kind}" data-action="$
 
 /* ---------- dados (sempre vindos do servidor) ---------- */
 const emptyDb=()=>({me:null,email:'',courts:[],hours:[7,8,9,10,11,14,15,16,17,18,19,20,21],teachers:[],players:[],reservations:[],events:[],posts:[],myPosts:[],challenges:[],agenda:null});
-let db=emptyDb(), sb=null;
+let db=emptyDb();
+/* sessão: o servidor devolve um token no login e o app guarda neste aparelho */
+const SKEY='in-tennis-session';
+const getSess=()=>{try{return JSON.parse(localStorage.getItem(SKEY))}catch{return null}};
+const setSess=v=>{try{v?localStorage.setItem(SKEY,JSON.stringify(v)):localStorage.removeItem(SKEY)}catch{}};
+async function endSession(){let s=getSess();setSess(null);db=emptyDb();state.hold=null;state.newProfile=false;if(s)fetch('/api/auth/sign-out',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+s.session},body:'{}'}).catch(()=>{});go('welcome')}
+async function authCall(path,body){
+  let res=await fetch('/api/auth'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  let json=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(json.error||'Não foi possível concluir. Tente novamente.');
+  return json;
+}
 let state={page:'welcome',court:'',date:today,time:'',type:'free',teacher:'',month:dateISO(today),rank:'geral',eventTab:'feed',profileTab:'posts',event:'',reservation:'',photo:'',zoom:1,hold:null,newProfile:false};
 let activeSheet='',timerHandle,deferredInstall=null;
 const avail={},summary={},fetching=new Set();
 
 async function api(path,opts={}){
-  let {data}=await sb.auth.getSession(),token=data.session?.access_token;
+  let token=getSess()?.session;
   let res=await fetch('/api'+path,{method:opts.method||'GET',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:opts.body?JSON.stringify(opts.body):undefined});
   let json=await res.json().catch(()=>({}));
-  if(res.status===401){setTimeout(()=>sb.auth.signOut(),0);throw new Error('Sua sessão expirou. Entre novamente.')}
+  if(res.status===401){setTimeout(endSession,0);throw new Error('Sua sessão expirou. Entre novamente.')}
   if(!res.ok)throw new Error(json.error||'Não foi possível concluir. Tente novamente.');
   return json;
 }
@@ -171,8 +182,8 @@ function classesHTML(){
 function authHTML(p){
   let title=p==='register'?'Seu próximo capítulo<br>começa na quadra.':p==='recover'?'Vamos recuperar<br>seu acesso.':p==='verify'?'Confira seu e-mail.':'Bom te ver<br>de novo.';
   let top=`<div class="auth-visual">${btn('← Voltar','go:welcome','auth-back')}<span class="auth-brand">IN.<small>TENNIS CLUB</small></span><div class="auth-visual-caption"><span>JOGUE. CONECTE. PERTENÇA.</span><b>O tênis é só o começo.</b></div></div><div class="auth-panel"><div class="section-kicker">ENTRE PARA O CLUBE</div><h1>${title}</h1>`;
-  if(p==='verify')return top+`<div class="success">✉</div><p>Enviamos um link de confirmação para <b>${esc(state.pendingEmail||'o seu e-mail')}</b>. Abra o e-mail, confirme e depois volte para entrar.</p>${btn('Já confirmei, entrar','go:login')}<div class="tiny center mt">Não chegou? Veja também a caixa de spam.</div></div>`;
-  return top+`<form data-form="${p}">${p==='register'?'<div class="field"><label for="authName">Seu nome</label><input id="authName" name="name" placeholder="Como você gosta de ser chamado?" required maxlength="60"></div>':''}<div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" placeholder="voce@exemplo.com" autocomplete="email" required></div>${p!=='recover'?`<div class="field"><label for="password">Senha</label><input id="password" name="password" type="password" minlength="6" placeholder="Pelo menos 6 caracteres" autocomplete="${p==='register'?'new-password':'current-password'}" required></div>`:''}<button class="primary mt" type="submit">${p==='register'?'Criar minha conta':p==='recover'?'Recuperar acesso':'Entrar no clube'} ${icon('arrow')}</button></form>${p==='login'?btn('Esqueci minha senha','go:recover','text-btn mt'):''}</div>`;
+  if(p==='verify')return top+`<div class="success">✉</div><p>Sua conta foi criada. Entre para continuar.</p>${btn('Já confirmei, entrar','go:login')}<div class="tiny center mt">Não chegou? Veja também a caixa de spam.</div></div>`;
+  return top+`<form data-form="${p}">${p==='register'?'<div class="field"><label for="authName">Seu nome</label><input id="authName" name="name" placeholder="Como você gosta de ser chamado?" required maxlength="60"></div>':''}<div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" placeholder="voce@exemplo.com" autocomplete="email" required></div>${p!=='recover'?`<div class="field"><label for="password">Senha</label><input id="password" name="password" type="password" minlength="8" placeholder="Pelo menos 8 caracteres" autocomplete="${p==='register'?'new-password':'current-password'}" required></div>`:''}<button class="primary mt" type="submit">${p==='register'?'Criar minha conta':p==='recover'?'Recuperar acesso':'Entrar no clube'} ${icon('arrow')}</button></form>${p==='login'?btn('Esqueci minha senha','go:recover','text-btn mt'):''}</div>`;
 }
 function editHTML(){
   let p=db.me||{name:'',username:'',bio:''},fresh=state.newProfile,img=state.photo||p.avatarUrl;
@@ -258,9 +269,9 @@ async function action(a){
   case'share':{let x=[...db.posts,...db.myPosts].find(x=>x.id===id),text=`IN Tennis Club — ${x.name}: ${x.text}`;try{if(navigator.share){await navigator.share({text})}else{await navigator.clipboard.writeText(text);toast('Texto da publicação copiado para compartilhar.')}}catch(e){if(e?.name!=='AbortError')sheet('Compartilhar',`<div class="notice">${esc(x.text)}</div><p class="sub">Selecione e copie o texto para compartilhar.</p>`)}break}
   case'deletePost':sheet('Apagar publicação?',`<p class="sub">Você pode apagar somente as suas publicações.</p>${btn('Apagar',`deletePostConfirm:${id}`,'danger')}`);break;
   case'deletePostConfirm':await api(`/posts/${id}`,{method:'DELETE'});db.posts=db.posts.filter(x=>x.id!==id);db.myPosts=db.myPosts.filter(x=>x.id!==id);closeSheet();renderApp(true);toast('Sua publicação foi apagada.');break;
-  case'logout':await sb.auth.signOut();break;
+  case'logout':await endSession();break;
   case'deleteMe':sheet('Apagar meus dados?',`<p class="sub">Isso apaga seu perfil, reservas, publicações e pontos do clube. Não dá para desfazer.</p>${btn('Apagar tudo',`deleteMeConfirm`,'danger')}${btn('Cancelar','closeSheet','secondary mt')}`);break;
-  case'deleteMeConfirm':await api('/me',{method:'DELETE'});await sb.auth.signOut();toast('Seus dados foram apagados.');break;
+  case'deleteMeConfirm':await api('/me',{method:'DELETE'});await endSession();toast('Seus dados foram apagados.');break;
   case'closeSheet':closeSheet();break;
   case'install':installApp();break;
   case'rules':sheet('Seu jogo vale pontos',`<div class="check-list">Check-in em jogo livre: +10<br>Check-in em aula: +20<br>Vitória em desafio confirmado: +30<br>Derrota em desafio confirmado: +10<br>Até 3 jogos pontuados por jogador/dia<br>Top 8 do ranking: convite para o torneio</div><div class="notice">O servidor valida presença, horários, placares, limites e pontos.</div>`);break;
@@ -272,11 +283,11 @@ async function action(a){
 const readFile=file=>new Promise((resolve,reject)=>{let r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file)});
 async function cropPhoto(src,zoom=1,cors=false){let img=new Image();if(cors)img.crossOrigin='anonymous';img.src=src;await img.decode();let canvas=document.createElement('canvas');canvas.width=canvas.height=360;let ctx=canvas.getContext('2d'),side=Math.min(img.width,img.height)/zoom;ctx.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,360,360);return canvas}
 const toBlob=(canvas,type='image/jpeg',q=.84)=>new Promise((res,rej)=>canvas.toBlob(b=>b?res(b):rej(new Error('Falha ao preparar a imagem')),type,q));
-async function upload(bucket,blob,ext,contentType){
-  let uid=(await sb.auth.getSession()).data.session.user.id,path=`${uid}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
-  let {error}=await sb.storage.from(bucket).upload(path,blob,{contentType,cacheControl:'31536000'});
-  if(error)throw new Error('Não foi possível enviar o arquivo. Tente novamente.');
-  return sb.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+async function upload(kind,blob,contentType){
+  let r=await api('/uploads',{method:'POST',body:{kind,contentType}});
+  let put=await fetch(r.uploadUrl,{method:'PUT',headers:{'Content-Type':contentType},body:blob});
+  if(!put.ok)throw new Error('Não foi possível enviar o arquivo. Tente novamente.');
+  return r.key;
 }
 
 /* ---------- eventos do documento ---------- */
@@ -286,17 +297,17 @@ document.addEventListener('submit',async e=>{
   let f=e.target;if(!f.matches('#phone form[data-form]'))return;e.preventDefault();
   let data=Object.fromEntries(new FormData(f)),id=f.dataset.id,kind=f.dataset.form,submit=f.querySelector('[type=submit]');if(submit?.disabled)return;if(submit)submit.disabled=true;
   try{switch(kind){
-  case'login':{let {error}=await sb.auth.signInWithPassword({email:data.email.trim(),password:data.password});if(error)throw new Error(friendly(error.message));await enter();return}
-  case'register':{let {data:r,error}=await sb.auth.signUp({email:data.email.trim(),password:data.password,options:{data:{name:data.name.trim()},emailRedirectTo:location.origin}});if(error)throw new Error(friendly(error.message));if(r.user&&r.user.identities&&r.user.identities.length===0)throw new Error('Esse e-mail já tem conta. Entre ou recupere a senha.');if(r.session){await enter();return}state.pendingEmail=data.email.trim();go('verify');return}
-  case'recover':{let {error}=await sb.auth.resetPasswordForEmail(data.email.trim(),{redirectTo:location.origin});if(error)throw new Error(friendly(error.message));sheet('Pedido enviado',`<p>Se existir uma conta com esse e-mail, você receberá um link para redefinir a senha.</p>${btn('Voltar ao login','go:login')}`);return}
-  case'newpass':{let {error}=await sb.auth.updateUser({password:data.password});if(error)throw new Error(friendly(error.message));closeSheet();toast('Senha atualizada.');await enter();return}
+  case'login':{let r=await authCall('/sign-in',{email:data.email.trim(),password:data.password});setSess({session:r.session,user:r.user});await enter();return}
+  case'register':{let r=await authCall('/sign-up',{email:data.email.trim(),password:data.password,name:data.name.trim()});setSess({session:r.session,user:r.user,name:data.name.trim()});await enter();return}
+  case'recover':{await authCall('/forgot',{email:data.email.trim()});sheet('Digite o código',`<p>Se existir uma conta com esse e-mail, enviamos um código de 6 dígitos. Ele vale por poucos minutos.</p><form data-form="reset" data-id="${esc(data.email.trim())}">${formField('Código recebido','otp','text','','required inputmode="numeric" autocomplete="one-time-code" maxlength="8"')}${formField('Nova senha','password','password','','required minlength="8" autocomplete="new-password"')}<button class="primary" type="submit">Trocar senha</button></form>`);return}
+  case'reset':{await authCall('/reset',{email:id,otp:data.otp,password:data.password});closeSheet();go('login');toast('Senha atualizada. Agora é só entrar.');return}
   case'profile':{
     let handle=data.handle.trim().toLowerCase(),body={name:data.name.trim(),username:handle,bio:(data.bio||'').trim()};
     if(state.newProfile){await api('/me',{method:'POST',body})}
     if(state.photo||state.zoom!==1){
       let src=state.photo||db.me?.avatarUrl,canvas;
       if(src){try{canvas=await cropPhoto(src,state.zoom,!state.photo)}catch(err){if(state.photo)throw err}}
-      if(canvas)body.avatarUrl=await upload('avatars',await toBlob(canvas),'jpg','image/jpeg');
+      if(canvas)body.avatarKey=await upload('avatar',await toBlob(canvas),'image/jpeg');
     }
     await api('/me',{method:'PATCH',body});
     state.photo='';state.zoom=1;let wasNew=state.newProfile;state.newProfile=false;
@@ -307,9 +318,9 @@ document.addEventListener('submit',async e=>{
     if(!text&&!file){toast('Escreva algo ou escolha uma foto ou vídeo.');return}
     if(file&&file.size>20*1024*1024){toast('Escolha uma foto ou vídeo de até 20 MB.');return}
     if(file&&!/^(image|video)\//.test(file.type)){toast('Escolha uma foto ou vídeo.');return}
-    let mediaUrl,tag='treino';
-    if(file){let ext=(file.name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5)||'bin';mediaUrl=await upload('posts',file,ext,file.type);tag=file.type.startsWith('video')?'video':'foto'}
-    await api('/posts',{method:'POST',body:{text,tag,mediaUrl}});
+    let mediaKey,tag='treino';
+    if(file){mediaKey=await upload('post',file,file.type);tag=file.type.startsWith('video')?'video':'foto'}
+    await api('/posts',{method:'POST',body:{text,tag,mediaKey}});
     await Promise.allSettled([loaders.posts(),loaders.myPosts()]);go('social');toast('Seu momento está no feed.');return}
   case'comment':{await api(`/posts/${id}/comments`,{method:'POST',body:{text:data.comment}});await openComments(id);renderApp(true);return}
   case'score':{await api(`/matches/${id}/report`,{method:'POST',body:{result:data.winner==='me'?'vitoria':'derrota',score:data.sets}});await loaders.matches();closeSheet();renderApp();toast('Placar enviado. Aguardando confirmação do adversário.');return}
@@ -330,24 +341,16 @@ async function enter(){
   db=emptyDb();state.newProfile=false;state.hold=null;
   await loadAll();
   if(!db.me){
-    let {data}=await sb.auth.getSession(),meta=data.session?.user?.user_metadata||{},email=data.session?.user?.email||'';
-    db.me={name:meta.name||'',username:(email.split('@')[0]||'').toLowerCase().replace(/[^a-z0-9._]/g,'').slice(0,20),bio:''};
+    let s=getSess()||{},email=s.user?.email||db.email||'';
+    db.me={name:s.name||'',username:(email.split('@')[0]||'').toLowerCase().replace(/[^a-z0-9._]/g,'').slice(0,20),bio:''};
     state.newProfile=true;go('edit');return;
   }
   state.date=today;state.month=dateISO(today);state.type='free';state.page='schedule';go('schedule');
 }
 async function boot(){
   state.page='boot';renderApp();
-  if(!window.supabase){$('#phone').innerHTML='<div class="empty center" style="padding:40vh 24px 0">Não foi possível carregar o app. Atualize a página.</div>';return}
-  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-  sb.auth.onAuthStateChange((ev)=>{
-    if(ev==='SIGNED_OUT'){db=emptyDb();state.hold=null;state.newProfile=false;setTimeout(()=>go('welcome'),0)}
-    if(ev==='PASSWORD_RECOVERY')setTimeout(()=>{go('welcome');sheet('Nova senha',`<form data-form="newpass">${formField('Nova senha','password','password','','required minlength="6" autocomplete="new-password"')}<button class="primary" type="submit">Salvar senha</button></form>`)},0);
-  });
   try{
-    let {data}=await sb.auth.getSession();
-    if(location.hash.includes('type=recovery'))return;
-    if(data.session)await enter();else go('welcome');
+    if(getSess()?.session)await enter();else go('welcome');
   }catch(err){console.error(err);go('welcome');toast(friendly(err.message||'Não foi possível carregar.'))}
 }
 if('serviceWorker'in navigator)navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
