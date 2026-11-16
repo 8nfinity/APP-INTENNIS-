@@ -35,7 +35,7 @@ app.use(express.json({ limit: '20kb' }));
 
 // Banco: Supabase Postgres. Defina DATABASE_URL nas variáveis do Railway.
 const pool = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 10 })
+  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: process.env.VERCEL ? 3 : 10 })
   : null;
 
 app.get('/api/health', async (_req, res) => {
@@ -88,5 +88,9 @@ app.use((req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Servidor na porta ${port}`));
+// Local/Railway: sobe o servidor. Na Vercel, a função importa o app exportado.
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => console.log(`Servidor na porta ${port}`));
+}
+module.exports = app;
